@@ -316,9 +316,14 @@ const [dados, setDados] = useState<any[]>([])
 )
 
   // ── Filtered rows
-  const f07 = useMemo(() =>
-    ufFilter === 'TODOS' ? total07 : total07.filter(r => String(r.UF).trim() === ufFilter),
-    [total07, ufFilter])
+const f07 = useMemo(() =>
+  ufFilter === 'TODOS'
+    ? dados
+    : dados.filter(
+        r => String(r.uf).trim() === ufFilter
+      ),
+  [dados, ufFilter]
+)
 
   const f12 = useMemo(() =>
     ufFilter === 'TODOS' ? pend12 : pend12.filter(r => String(r.UF).trim() === ufFilter),
