@@ -313,9 +313,9 @@ const dadosFiltrados = useMemo(() => {
 
   return dados.filter((r: any) => {
 
-    if (!r.created_at) return true
+ if (!r.data_ref) return true
 
-    const data = new Date(r.created_at)
+const data = new Date(r.data_ref)
 
     if (isNaN(data.getTime())) return true
 
