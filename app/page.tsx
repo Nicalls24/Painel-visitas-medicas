@@ -433,7 +433,7 @@ const uf = String(r.UF || '').trim()
       }
     })
 
-const nomeArquivo = file.name
+const nomeArquivo = e.target.files[0].name
 
 // procura padrão 11.05 ou 12.05
 const match = nomeArquivo.match(/(\d{2})\.(\d{2})/)
