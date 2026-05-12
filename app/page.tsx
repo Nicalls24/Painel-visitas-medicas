@@ -330,8 +330,8 @@ console.log('12H', r12[0])
 
     r07.forEach((r: any) => {
 
-      const unidade = String(r.UNIDADE || '').trim()
-      const uf = String(r.UF || '').trim()
+const unidade = String(r.UNIDADE || '').trim()
+const uf = String(r.UF || '').trim()
 
       const key = `${uf}-${unidade}`
 
@@ -348,8 +348,8 @@ console.log('12H', r12[0])
 
     r12.forEach((r: any) => {
 
-      const unidade = String(r.UNIDADE || '').trim()
-      const uf = String(r.UF || '').trim()
+const unidade = String(r.UNIDADE || '').trim()
+const uf = String(r.UF || '').trim()
 
       const key = `${uf}-${unidade}`
 
