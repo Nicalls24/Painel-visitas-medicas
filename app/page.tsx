@@ -308,9 +308,12 @@ const [dados, setDados] = useState<any[]>([])
 }
 
   // ── UF list
-  const ufs = useMemo(() =>
-    [...new Set(total07.map(r => String(r.UF || '').trim()).filter(Boolean))].sort(),
-    [total07])
+ const ufs = useMemo(() =>
+  [...new Set(
+    dados.map(r => String(r.uf || '').trim()).filter(Boolean)
+  )].sort(),
+  [dados]
+)
 
   // ── Filtered rows
   const f07 = useMemo(() =>
