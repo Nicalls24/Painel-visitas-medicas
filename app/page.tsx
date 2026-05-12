@@ -622,7 +622,6 @@ const postoStats = useMemo((): PostoStat[] => {
                 <option value="TODOS">Todos os Estados</option>
                 {ufs.map(u => <option key={u}>{u}</option>)}
               </select>
-              </select>
 
 <select
   value={dateFilter}
