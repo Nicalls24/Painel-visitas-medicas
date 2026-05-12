@@ -257,9 +257,13 @@ function GaugeStrip({ pct }: { pct: number }) {
 // ─── Main Component ───────────────────────────────────────
 export default function Page() {
 const [dados, setDados] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [ufFilter, setUfFilter] = useState('TODOS')
-  const [tab, setTab] = useState<'unidades' | 'postos' | 'ufs'>('unidades')
+const [loading, setLoading] = useState(false)
+const [ufFilter, setUfFilter] = useState('TODOS')
+
+const [tab, setTab] =
+  useState<'unidades' | 'postos' | 'ufs'>('unidades')
+
+const [dateFilter, setDateFilter] = useState('hoje')
   useEffect(() => {
 
   async function carregarDados() {
@@ -298,7 +302,35 @@ const [dados, setDados] = useState<any[]>([])
 
 }, [])
 
- const loaded = dados.length > 0
+const dadosFiltrados = useMemo(() => {
+
+  const hoje = new Date()
+
+  return dados.filter((r: any) => {
+
+    const data = new Date(r.created_at)
+
+    if (dateFilter === 'hoje') {
+      return data.toDateString() === hoje.toDateString()
+    }
+
+    if (dateFilter === 'mes') {
+      return (
+        data.getMonth() === hoje.getMonth() &&
+        data.getFullYear() === hoje.getFullYear()
+      )
+    }
+
+    if (dateFilter === 'ano') {
+      return data.getFullYear() === hoje.getFullYear()
+    }
+
+    return true
+  })
+
+}, [dados, dateFilter])
+
+const loaded = dados.length > 0
 
   // ── Upload handler
  const handleFiles = async (
@@ -427,17 +459,17 @@ const f07 = useMemo(() =>
 )
 
 // ── Global KPIs
-const gtotal = dados.reduce(
+const gtotal = dadosFiltrados.reduce(
   (acc, r) => acc + Number(r.previstas || 0),
   0
 )
 
-const gpend = dados.reduce(
+const gpend = dadosFiltrados.reduce(
   (acc, r) => acc + Number(r.pendentes || 0),
   0
 )
 
-const greal = dados.reduce(
+const greal = dadosFiltrados.reduce(
   (acc, r) => acc + Number(r.realizadas || 0),
   0
 )
@@ -455,7 +487,7 @@ const gAtingiu = gslaPct >= SLA_META
   // ── Unit stats
 const unitStats = useMemo((): UnitStat[] => {
 
-  return dados.map((r: any) => {
+  return dadosFiltrados.map((r: any) => {
 
     const total = Number(r.previstas || 0)
     const pendentes = Number(r.pendentes || 0)
@@ -487,7 +519,7 @@ const ufStats = useMemo(() => {
 
   const mapa: any = {}
 
-  dados.forEach((r: any) => {
+  dadosFiltrados.forEach((r: any) => {
 
     const uf = String(r.uf || '').trim()
 
@@ -520,7 +552,7 @@ const ufStats = useMemo(() => {
   // ── Posto stats
 const postoStats = useMemo((): PostoStat[] => {
 
-  return dados.map((r: any) => {
+ return dadosFiltrados.map((r: any) => {
 
     const total = Number(r.previstas || 0)
     const pendentes = Number(r.pendentes || 0)
