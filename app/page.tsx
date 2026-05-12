@@ -453,27 +453,27 @@ const gfalta = Math.max(
 const gAtingiu = gslaPct >= SLA_META
 
   // ── Unit stats
-  const unitStats = useMemo((): UnitStat[] => {
-    const totMap: Record<string, { total: number; uf: string }> = {}
-    f07.forEach(r => {
-      const k = String(r.UNIDADE || '').trim()
-      if (!k) return
-      if (!totMap[k]) totMap[k] = { total: 0, uf: String(r.UF || '').trim() }
-      totMap[k].total++
-    })
-    const pendMap: Record<string, number> = {}
-    f12.forEach(r => {
-      const k = String(r.UNIDADE || '').trim()
-      if (!k) return
-      pendMap[k] = (pendMap[k] || 0) + 1
-    })
-    return Object.entries(totMap).map(([unidade, { total, uf }]) => {
-      const pendentes  = pendMap[unidade] || 0
-      const realizadas = total - pendentes
-      const sla        = total > 0 ? (realizadas / total) * 100 : 0
-      return { unidade, uf, total, pendentes, realizadas, sla }
-    })
-  }, [f07, f12])
+const unitStats = useMemo((): UnitStat[] => {
+
+  return dados.map((r: any) => {
+
+    const total = Number(r.previstas || 0)
+    const pendentes = Number(r.pendentes || 0)
+    const realizadas = Number(r.realizadas || 0)
+
+    return {
+      unidade: r.unidade,
+      uf: r.uf,
+      total,
+      pendentes,
+      realizadas,
+      sla: total > 0
+        ? (realizadas / total) * 100
+        : 0
+    }
+  })
+
+}, [dados])
 
   const byPendDesc   = [...unitStats].sort((a, b) => b.pendentes - a.pendentes)
   const bySlaAsc     = [...unitStats].filter(u => u.sla < SLA_META).sort((a, b) => a.sla - b.sla)
@@ -483,47 +483,62 @@ const gAtingiu = gslaPct >= SLA_META
   const slaRisk      = unitStats.filter(u => u.sla >= 40 && u.sla < SLA_META).length
 
   // ── UF stats
-  const ufStats = useMemo(() => {
-    const m: Record<string, { total: number; pend: number }> = {}
-    f07.forEach(r => {
-      const k = String(r.UF || '').trim(); if (!k) return
-      if (!m[k]) m[k] = { total: 0, pend: 0 }
-      m[k].total++
-    })
-    f12.forEach(r => {
-      const k = String(r.UF || '').trim(); if (!k) return
-      if (m[k]) m[k].pend++
-    })
-    return Object.entries(m).map(([uf, { total, pend }]) => ({
-      uf, total, pend, real: total - pend,
-      sla: total > 0 ? ((total - pend) / total) * 100 : 0,
-    })).sort((a, b) => a.sla - b.sla)
-  }, [f07, f12])
+const ufStats = useMemo(() => {
+
+  const mapa: any = {}
+
+  dados.forEach((r: any) => {
+
+    const uf = String(r.uf || '').trim()
+
+    if (!mapa[uf]) {
+      mapa[uf] = {
+        total: 0,
+        pend: 0,
+        real: 0
+      }
+    }
+
+    mapa[uf].total += Number(r.previstas || 0)
+    mapa[uf].pend += Number(r.pendentes || 0)
+    mapa[uf].real += Number(r.realizadas || 0)
+  })
+
+  return Object.entries(mapa).map(([uf, v]: any) => ({
+    uf,
+    total: v.total,
+    pend: v.pend,
+    real: v.real,
+    sla:
+      v.total > 0
+        ? (v.real / v.total) * 100
+        : 0
+  }))
+
+}, [dados])
 
   // ── Posto stats
-  const postoStats = useMemo((): PostoStat[] => {
-    const tot: Record<string, { total: number; unidade: string }> = {}
-    f07.forEach(r => {
-      const k = String(r.POSTO || '').trim(); if (!k) return
-      if (!tot[k]) tot[k] = { total: 0, unidade: String(r.UNIDADE || '').trim() }
-      tot[k].total++
-    })
-    const pen: Record<string, number> = {}
-    f12.forEach(r => {
-      const k = String(r.POSTO || '').trim(); if (!k) return
-      pen[k] = (pen[k] || 0) + 1
-    })
-    return Object.entries(tot).map(([posto, { total, unidade }]) => {
-      const pendentes  = pen[posto] || 0
-      const realizadas = total - pendentes
-      return {
-        posto, unidade, total, pendentes, realizadas,
-        sla: total > 0 ? (realizadas / total) * 100 : 0,
-      }
-    })
-      .filter(p => p.sla < SLA_META)
-      .sort((a, b) => b.pendentes - a.pendentes)
-  }, [f07, f12])
+const postoStats = useMemo((): PostoStat[] => {
+
+  return dados.map((r: any) => {
+
+    const total = Number(r.previstas || 0)
+    const pendentes = Number(r.pendentes || 0)
+    const realizadas = Number(r.realizadas || 0)
+
+    return {
+      posto: r.unidade,
+      unidade: r.unidade,
+      total,
+      pendentes,
+      realizadas,
+      sla:
+        total > 0
+          ? (realizadas / total) * 100
+          : 0
+    }
+  })
+}, [dados])
 
   return (
     <div style={{
