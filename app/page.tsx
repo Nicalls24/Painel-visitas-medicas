@@ -282,7 +282,7 @@ export default function VisitasPage() {
 
   // ── Upload: aceita múltiplos arquivos
   const handleFiles = useCallback(async (e) => {
-    const files = Array.from(e.target.files || [])
+    const files = Array.from(e.target.files || []) as File[]
     if (!files.length) return
     setLoading(true)
     try {
