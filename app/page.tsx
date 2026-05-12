@@ -301,22 +301,11 @@ const [dados, setDados] = useState<any[]>([])
  const loaded = dados.length > 0
 
   // ── Upload handler
-  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length < 2) return
-    setLoading(true)
-    try {
-      // Detect which is 07h (total) vs 12h (pendentes) by name
-      const f07 = files.find(f => !f.name.includes('12')) ?? files[1]
-      const f12 = files.find(f =>  f.name.includes('12')) ?? files[0]
-      const [r07, r12] = await Promise.all([readXlsx(f07), readXlsx(f12)])
-      setTotal07(r07)
-      setPend12(r12)
-      setUfFilter('TODOS')
-    } finally { setLoading(false) }
-  }
+ 
 
-  const reset = () => { setTotal07([]); setPend12([]); setUfFilter('TODOS') }
+  const reset = () => {
+  setUfFilter('TODOS')
+}
 
   // ── UF list
   const ufs = useMemo(() =>
