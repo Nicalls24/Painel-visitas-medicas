@@ -433,10 +433,24 @@ const uf = String(r.UF || '').trim()
       }
     })
 
-const hoje = new Date()
+const nomeArquivo = file.name
 
-const dataRef =
-  hoje.toISOString().split('T')[0]
+// procura padrão 11.05 ou 12.05
+const match = nomeArquivo.match(/(\d{2})\.(\d{2})/)
+
+let dataRef = new Date()
+  .toISOString()
+  .split('T')[0]
+
+if (match) {
+
+  const dia = match[1]
+  const mes = match[2]
+
+  const ano = new Date().getFullYear()
+
+  dataRef = `${ano}-${mes}-${dia}`
+}
 
 const finalDataComData = finalData.map((r) => ({
   ...r,
