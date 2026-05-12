@@ -433,14 +433,19 @@ const uf = String(r.UF || '').trim()
       }
     })
 
-    await supabase
-      .from('visitas_medicas')
-      .delete()
-      .neq('id', 0)
+const hoje = new Date()
 
-    await supabase
-      .from('visitas_medicas')
-      .insert(finalData)
+const dataRef =
+  hoje.toISOString().split('T')[0]
+
+const finalDataComData = finalData.map((r) => ({
+  ...r,
+  data_ref: dataRef
+}))
+
+await supabase
+  .from('visitas_medicas')
+  .insert(finalDataComData)
 
   } finally {
 
