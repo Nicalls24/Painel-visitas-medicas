@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 
 // Parser CSV nativo (sem dependência externa)
-const parseCSV = (text, delimiter = ';') => {
+const parseCSV = (text: string, delimiter = ';'): string[][] => {
   return text
     .split('\n')
     .map(line => line.split(delimiter).map(cell => cell.trim().replace(/^"|"$/g, '')))
@@ -32,7 +32,7 @@ const META = 90
 
 // ─── Helpers ─────────────────────────────────────────────
 // Extrai data do nome do arquivo: "VisitasMedicas_07H_12_05.xlsx" → '2026-05-12'
-const extractDateFromName = (name) => {
+const extractDateFromName = (name: string): string | null => {
   const m = name.match(/_(\d{2})_(\d{2})/); // DD_MM
   if (!m) return null
   const day = m[1], month = m[2]
@@ -41,32 +41,32 @@ const extractDateFromName = (name) => {
 }
 
 // Extrai hora do nome: "07H" → 7, "12H" → 12
-const extractHourFromName = (name) => {
+const extractHourFromName = (name: string): number | null => {
   const m = name.match(/_(\d{2})H_/)
   return m ? parseInt(m[1]) : null
 }
 
 // É arquivo de 07h (previstas) ou 12h (pendentes)?
-const isPrevistas = (name) => {
+const isPrevistas = (name: string): boolean => {
   const h = extractHourFromName(name)
   return h !== null && h < 12  // 07H = previstas
 }
 
 // Lê arquivo xlsx ou csv e retorna rows
-const parseFile = async (file) => {
+const parseFile = async (file: File): Promise<Record<string, string>[]> => {
   const name = file.name
   const isXlsx = name.toLowerCase().endsWith('.xlsx') || name.toLowerCase().endsWith('.xls')
 
-  let rows = []
+  let rows: Record<string, string>[] = []
   if (isXlsx) {
     const buf = await file.arrayBuffer()
     const wb  = XLSX.read(buf, { type: 'buffer' })
     const ws  = wb.Sheets[wb.SheetNames[0]]
-    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
     // Primeira linha real é o header (UF, UNIDADE, POSTO…)
     const header = raw[1] || raw[0]
     rows = raw.slice(header === raw[0] ? 1 : 2).map(r => {
-      const obj = {}
+      const obj: Record<string, string> = {}
       header.forEach((h, i) => { obj[String(h).trim()] = String(r[i] ?? '').trim() })
       return obj
     })
@@ -76,7 +76,7 @@ const parseFile = async (file) => {
     const raw  = parseCSV(text, ';')
     const header = raw[1] || raw[0]
     rows = raw.slice(header === raw[0] ? 1 : 2).map(r => {
-      const obj = {}
+      const obj: Record<string, string> = {}
       header.forEach((h, i) => { obj[String(h).trim()] = String(r[i] ?? '').trim() })
       return obj
     })
@@ -85,12 +85,12 @@ const parseFile = async (file) => {
 }
 
 // Data hoje e ontem no horário local
-const localDateStr = (offset = 0) => {
+const localDateStr = (offset = 0): string => {
   const d = new Date()
   d.setDate(d.getDate() + offset)
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
-const fmtDate = (s) => s ? s.split('-').reverse().join('/') : ''
+const fmtDate = (s: string | null): string => s ? s.split('-').reverse().join('/') : ''
 
 // ─── Período filter ───────────────────────────────────────
 const PERIODOS = [
@@ -101,7 +101,7 @@ const PERIODOS = [
   { key: 'MÊS',    label: 'Mês'    },
 ]
 
-const filterByPeriodo = (dateStr, período) => {
+const filterByPeriodo = (dateStr: string, período: string): boolean => {
   if (período === 'TODOS' || !dateStr) return true
   const today    = localDateStr(0)
   const ontem    = localDateStr(-1)
@@ -118,14 +118,30 @@ const filterByPeriodo = (dateStr, período) => {
 }
 
 // ─── SLA calculation helpers ─────────────────────────────
-const slaColor = (pct) =>
+const slaColor = (pct: number): string =>
   pct >= META ? C.green : pct >= 70 ? C.yellow : C.red
 
-const slaLabel = (pct) =>
+const slaLabel = (pct: number): string =>
   pct >= META ? 'OK' : pct >= 70 ? 'Em Risco' : 'Crítico'
 
+// ─── Types ────────────────────────────────────────────────
+interface Snapshot {
+  date: string
+  previstas: Record<string, string>[]
+  pendentes: Record<string, string>[]
+}
+
+interface UnidadeRow {
+  uf: string
+  unidade: string
+  previstas: number
+  pendentes: number
+  realizadas: number
+  sla: number
+}
+
 // ─── Sub-components ───────────────────────────────────────
-function Card({ children, style = {} }) {
+function Card({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`,
       borderRadius: 14, padding: 18, ...style }}>
@@ -134,7 +150,10 @@ function Card({ children, style = {} }) {
   )
 }
 
-function KpiCard({ icon, label, value, sub, accent, note }) {
+function KpiCard({ icon, label, value, sub, accent, note }: {
+  icon: string; label: string; value: string | number
+  sub?: string; accent: string; note?: string
+}) {
   return (
     <div style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: 14,
       padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 6,
@@ -155,7 +174,7 @@ function KpiCard({ icon, label, value, sub, accent, note }) {
 }
 
 // Donut SVG
-function Donut({ pct, size = 130 }) {
+function Donut({ pct, size = 130 }: { pct: number; size?: number }) {
   const r   = 46, cx = 60, cy = 60
   const circ = 2 * Math.PI * r
   const dash = (pct / 100) * circ
@@ -175,7 +194,7 @@ function Donut({ pct, size = 130 }) {
 }
 
 // Barra de progresso vs meta
-function ProgressBar({ pct }) {
+function ProgressBar({ pct }: { pct: number }) {
   const color = slaColor(pct)
   const metaPct = META
   return (
@@ -199,7 +218,7 @@ function ProgressBar({ pct }) {
 }
 
 // Tabela de unidades
-function UnidadeTable({ rows, showUF }) {
+function UnidadeTable({ rows, showUF }: { rows: UnidadeRow[]; showUF: boolean }) {
   return (
     <div style={{ overflowY: 'auto', maxHeight: 460 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -254,7 +273,7 @@ function UnidadeTable({ rows, showUF }) {
 // ─── Main ─────────────────────────────────────────────────
 export default function VisitasPage() {
   // snapshots: { date: 'YYYY-MM-DD', previstas: Row[], pendentes: Row[] }[]
-  const [snapshots,  setSnapshots]  = useState([])
+  const [snapshots,  setSnapshots]  = useState<Snapshot[]>([])
   const [loading,    setLoading]    = useState(false)
   const [período,    setPeriodo]    = useState('HOJE')
   const [ufFiltro,   setUfFiltro]   = useState('TODOS')
@@ -267,7 +286,7 @@ export default function VisitasPage() {
     if (!files.length) return
     setLoading(true)
     try {
-      const newSnaps = { ...snapshots.reduce((a, s) => ({ ...a, [s.date]: s }), {}) }
+      const newSnaps: Record<string, Snapshot> = { ...snapshots.reduce((a, s) => ({ ...a, [s.date]: s }), {} as Record<string, Snapshot>) }
 
       for (const file of files) {
         const date = extractDateFromName(file.name)
@@ -298,7 +317,8 @@ export default function VisitasPage() {
     if (!filteredSnaps.length) return { previstas: [], pendentes: [], dates: [] }
 
     // Para cada unidade, soma previstas e pendentes de todos os dias filtrados
-    const prevMap = {}, pendMap = {}
+    const prevMap: Record<string, { uf: string; unidade: string; count: number }> = {}
+    const pendMap: Record<string, { uf: string; unidade: string; count: number }> = {}
 
     for (const snap of filteredSnaps) {
       for (const r of snap.previstas) {
@@ -350,7 +370,7 @@ export default function VisitasPage() {
 
   // ── Por UF
   const ufRows = useMemo(() => {
-    const m = {}
+    const m: Record<string, { uf: string; previstas: number; pendentes: number; realizadas: number }> = {}
     for (const r of unidadeRows) {
       if (!m[r.uf]) m[r.uf] = { uf: r.uf, previstas: 0, pendentes: 0, realizadas: 0 }
       m[r.uf].previstas  += r.previstas
