@@ -715,10 +715,16 @@ const postoStats = useMemo((): PostoStat[] => {
             <SlaRing pct={gslaPct} size={130} stroke={12} />
 
             <div style={{ flex: 1, minWidth: 260 }}>
-              <div style={{
-                fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                letterSpacing: '.12em', color: C.muted, marginBottom: 10,
-              {`SLA GERAL DE VISITAS MÉDICAS · ${new Date().toLocaleDateString('pt-BR')}`}
+             <div style={{
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '.12em',
+  color: C.muted,
+  marginBottom: 10,
+}}>
+  {`SLA GERAL DE VISITAS MÉDICAS · ${new Date().toLocaleDateString('pt-BR')}`}
+</div>
 
               <div style={{
                 fontSize: 44, fontWeight: 900, color: slaColor(gslaPct),
