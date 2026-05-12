@@ -301,7 +301,98 @@ const [dados, setDados] = useState<any[]>([])
  const loaded = dados.length > 0
 
   // ── Upload handler
- 
+ const handleFiles = async (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+
+  const files = Array.from(e.target.files || [])
+
+  if (files.length < 2) return
+
+  setLoading(true)
+
+  try {
+
+    const f07 =
+      files.find(f => f.name.includes('07')) || files[0]
+
+    const f12 =
+      files.find(f => f.name.includes('12')) || files[1]
+
+    const [r07, r12] = await Promise.all([
+      readXlsx(f07),
+      readXlsx(f12)
+    ])
+
+    const previstasPorUnidade = new Map()
+    const pendentesPorUnidade = new Map()
+
+    r07.forEach((r: any) => {
+
+      const unidade = String(r.UNIDADE || '').trim()
+      const uf = String(r.UF || '').trim()
+
+      const key = `${uf}-${unidade}`
+
+      if (!previstasPorUnidade.has(key)) {
+        previstasPorUnidade.set(key, {
+          unidade,
+          uf,
+          previstas: 0
+        })
+      }
+
+      previstasPorUnidade.get(key).previstas++
+    })
+
+    r12.forEach((r: any) => {
+
+      const unidade = String(r.UNIDADE || '').trim()
+      const uf = String(r.UF || '').trim()
+
+      const key = `${uf}-${unidade}`
+
+      if (!pendentesPorUnidade.has(key)) {
+        pendentesPorUnidade.set(key, 0)
+      }
+
+      pendentesPorUnidade.set(
+        key,
+        pendentesPorUnidade.get(key) + 1
+      )
+    })
+
+    const finalData = Array.from(
+      previstasPorUnidade.entries()
+    ).map(([key, value]: any) => {
+
+      const pendentes =
+        pendentesPorUnidade.get(key) || 0
+
+      return {
+        unidade: value.unidade,
+        uf: value.uf,
+        previstas: value.previstas,
+        pendentes,
+        realizadas:
+          value.previstas - pendentes
+      }
+    })
+
+    await supabase
+      .from('visitas_medicas')
+      .delete()
+      .neq('id', 0)
+
+    await supabase
+      .from('visitas_medicas')
+      .insert(finalData)
+
+  } finally {
+
+    setLoading(false)
+  }
+}
 
   const reset = () => {
   setUfFilter('TODOS')
@@ -483,7 +574,7 @@ const f07 = useMemo(() =>
   accept=".xlsx,.xls"
   multiple
   style={{ display: 'none' }}
-  onChange={() => {}}
+  onChange={handleFiles}
 />
           </label>
         </div>
