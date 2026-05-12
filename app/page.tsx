@@ -622,6 +622,27 @@ const postoStats = useMemo((): PostoStat[] => {
                 <option value="TODOS">Todos os Estados</option>
                 {ufs.map(u => <option key={u}>{u}</option>)}
               </select>
+              </select>
+
+<select
+  value={dateFilter}
+  onChange={e => setDateFilter(e.target.value)}
+  style={{
+    background: C.card,
+    border: `1px solid ${C.border}`,
+    borderRadius: 9,
+    color: C.text,
+    fontSize: 13,
+    padding: '7px 12px',
+    outline: 'none',
+    cursor: 'pointer',
+  }}
+>
+  <option value="hoje">Hoje</option>
+  <option value="mes">Mês Atual</option>
+  <option value="ano">Ano Atual</option>
+</select>
+
               <button onClick={reset} style={{
                 background: 'transparent', border: `1px solid ${C.border}`,
                 borderRadius: 9, color: C.sub, fontSize: 13,
