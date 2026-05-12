@@ -264,6 +264,9 @@ const [tab, setTab] =
   useState<'unidades' | 'postos' | 'ufs'>('unidades')
 
 const [dateFilter, setDateFilter] = useState('hoje')
+
+const [startDate, setStartDate] = useState('')
+const [endDate, setEndDate] = useState('')
   useEffect(() => {
 
   async function carregarDados() {
