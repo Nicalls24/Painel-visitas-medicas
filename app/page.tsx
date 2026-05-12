@@ -683,14 +683,11 @@ export default function VisitasPage() {
                       width: 64, display: 'flex', flexDirection: 'column',
                       alignItems: 'center', gap: 5, cursor: 'default',
                     }}>
-                    {/* Bolinha */}
                     <div style={{
                       width: 52, height: 52, borderRadius: '50%',
-                      background: color + '22',
-                      border: `3px solid ${color}`,
+                      background: color + '22', border: `3px solid ${color}`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexDirection: 'column',
-                      boxShadow: `0 0 12px ${color}44`,
+                      flexDirection: 'column', boxShadow: `0 0 12px ${color}44`,
                       transition: 'transform .15s',
                     }}
                       onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
@@ -700,7 +697,6 @@ export default function VisitasPage() {
                         {r.sla.toFixed(0)}%
                       </span>
                     </div>
-                    {/* Nome da unidade */}
                     <div style={{ fontSize: 8.5, color: C.muted, textAlign: 'center',
                       lineHeight: 1.3, maxWidth: 62, overflow: 'hidden',
                       display: '-webkit-box', WebkitLineClamp: 2,
@@ -714,7 +710,7 @@ export default function VisitasPage() {
           </Card>
 
           {/* ── Conteúdo das abas ── */}
-          <Card>
+          <Card style={{ marginBottom: 16 }}>
             {abaSel === 'unidades' && (
               <>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
