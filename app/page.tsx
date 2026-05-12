@@ -31,25 +31,36 @@ const C = {
 const META = 90
 
 // ─── Helpers ─────────────────────────────────────────────
-// Extrai data do nome do arquivo: "VisitasMedicas_07H_12_05.xlsx" → '2026-05-12'
+// Extrai data do nome do arquivo — aceita ambos os formatos:
+// "VisitasMedicas_07H_12_05.xlsx"  (underscores, original)
+// "VisitasMedicas 07H 12.05.xlsx"  (espaços e ponto, Windows)
 const extractDateFromName = (name: string): string | null => {
-  const m = name.match(/_(\d{2})_(\d{2})/); // DD_MM
-  if (!m) return null
-  const day = m[1], month = m[2]
-  const year = new Date().getFullYear()
-  return `${year}-${month}-${day}`
+  // Formato underscore: _DD_MM
+  const m1 = name.match(/_(\d{2})_(\d{2})\./);
+  if (m1) {
+    const year = new Date().getFullYear()
+    return `${year}-${m1[2]}-${m1[1]}`
+  }
+  // Formato Windows com espaço e ponto: " DD.MM."
+  const m2 = name.match(/\s(\d{2})\.(\d{2})\./);
+  if (m2) {
+    const year = new Date().getFullYear()
+    return `${year}-${m2[2]}-${m2[1]}`
+  }
+  return null
 }
 
-// Extrai hora do nome: "07H" → 7, "12H" → 12
+// Extrai hora do nome — aceita ambos os formatos
+// "07H_" ou "07H "
 const extractHourFromName = (name: string): number | null => {
-  const m = name.match(/_(\d{2})H_/)
+  const m = name.match(/(\d{2})H[\s_]/i)
   return m ? parseInt(m[1]) : null
 }
 
 // É arquivo de 07h (previstas) ou 12h (pendentes)?
 const isPrevistas = (name: string): boolean => {
   const h = extractHourFromName(name)
-  return h !== null && h < 12  // 07H = previstas
+  return h !== null && h < 12
 }
 
 // Lê arquivo xlsx ou csv e retorna rows
@@ -290,11 +301,6 @@ export default function VisitasPage() {
     const files = Array.from(e.target.files || []) as File[]
     if (!files.length) return
     setLoading(true)
-
-    // DEBUG: mostra os nomes exatos que o browser enviou
-    const nomes = files.map(f => f.name).join('\n')
-    alert('Nomes recebidos:\n' + nomes)
-
     try {
       const newSnaps: Record<string, Snapshot> = {}
 
