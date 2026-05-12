@@ -426,13 +426,31 @@ const f07 = useMemo(() =>
   [dados, ufFilter]
 )
 
-  // ── Global KPIs
-  const gtotal    = f07.length
-  const gpend     = f12.length
-  const greal     = gtotal - gpend
-  const gslaPct   = gtotal > 0 ? (greal / gtotal) * 100 : 0
-  const gfalta    = Math.max(0, Math.ceil(gtotal * SLA_META / 100) - greal)
-  const gAtingiu  = gslaPct >= SLA_META
+// ── Global KPIs
+const gtotal = dados.reduce(
+  (acc, r) => acc + Number(r.previstas || 0),
+  0
+)
+
+const gpend = dados.reduce(
+  (acc, r) => acc + Number(r.pendentes || 0),
+  0
+)
+
+const greal = dados.reduce(
+  (acc, r) => acc + Number(r.realizadas || 0),
+  0
+)
+
+const gslaPct =
+  gtotal > 0 ? (greal / gtotal) * 100 : 0
+
+const gfalta = Math.max(
+  0,
+  Math.ceil(gtotal * SLA_META / 100) - greal
+)
+
+const gAtingiu = gslaPct >= SLA_META
 
   // ── Unit stats
   const unitStats = useMemo((): UnitStat[] => {
