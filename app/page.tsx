@@ -664,6 +664,7 @@ const postoStats = useMemo((): PostoStat[] => {
   }}
 >
 <option value="hoje">Hoje</option>
+  <option value="ontem">Ontem</option>
 <option value="semana">Semana Atual</option>
 <option value="mes">Mês Atual</option>
 <option value="ano">Ano Atual</option>
