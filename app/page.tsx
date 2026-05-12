@@ -662,8 +662,37 @@ const postoStats = useMemo((): PostoStat[] => {
 <option value="semana">Semana Atual</option>
 <option value="mes">Mês Atual</option>
 <option value="ano">Ano Atual</option>
+<option value="custom">Período</option>
 </select>
+{dateFilter === 'custom' && (
+  <>
+    <input
+      type="date"
+      value={startDate}
+      onChange={e => setStartDate(e.target.value)}
+      style={{
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: 9,
+        color: C.text,
+        padding: '7px 12px',
+      }}
+    />
 
+    <input
+      type="date"
+      value={endDate}
+      onChange={e => setEndDate(e.target.value)}
+      style={{
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: 9,
+        color: C.text,
+        padding: '7px 12px',
+      }}
+    />
+  </>
+)}
               <button onClick={reset} style={{
                 background: 'transparent', border: `1px solid ${C.border}`,
                 borderRadius: 9, color: C.sub, fontSize: 13,
