@@ -304,14 +304,31 @@ const [dateFilter, setDateFilter] = useState('hoje')
 
 const dadosFiltrados = useMemo(() => {
 
+  if (!dados.length) return []
+
   const hoje = new Date()
 
   return dados.filter((r: any) => {
 
+    if (!r.created_at) return true
+
     const data = new Date(r.created_at)
+
+    if (isNaN(data.getTime())) return true
 
     if (dateFilter === 'hoje') {
       return data.toDateString() === hoje.toDateString()
+    }
+
+    if (dateFilter === 'semana') {
+
+      const inicioSemana = new Date(hoje)
+
+      inicioSemana.setDate(hoje.getDate() - hoje.getDay())
+
+      inicioSemana.setHours(0, 0, 0, 0)
+
+      return data >= inicioSemana
     }
 
     if (dateFilter === 'mes') {
@@ -326,6 +343,7 @@ const dadosFiltrados = useMemo(() => {
     }
 
     return true
+
   })
 
 }, [dados, dateFilter])
@@ -637,9 +655,10 @@ const postoStats = useMemo((): PostoStat[] => {
     cursor: 'pointer',
   }}
 >
-  <option value="hoje">Hoje</option>
-  <option value="mes">Mês Atual</option>
-  <option value="ano">Ano Atual</option>
+<option value="hoje">Hoje</option>
+<option value="semana">Semana Atual</option>
+<option value="mes">Mês Atual</option>
+<option value="ano">Ano Atual</option>
 </select>
 
               <button onClick={reset} style={{
@@ -699,7 +718,7 @@ const postoStats = useMemo((): PostoStat[] => {
               <div style={{
                 fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
                 letterSpacing: '.12em', color: C.muted, marginBottom: 10,
-              }}>SLA Geral de Visitas Médicas · 08/05</div>
+              {`SLA GERAL DE VISITAS MÉDICAS · ${new Date().toLocaleDateString('pt-BR')}`}
 
               <div style={{
                 fontSize: 44, fontWeight: 900, color: slaColor(gslaPct),
