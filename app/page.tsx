@@ -325,9 +325,14 @@ const f07 = useMemo(() =>
   [dados, ufFilter]
 )
 
-  const f12 = useMemo(() =>
-    ufFilter === 'TODOS' ? pend12 : pend12.filter(r => String(r.UF).trim() === ufFilter),
-    [pend12, ufFilter])
+ const f12 = useMemo(() =>
+  ufFilter === 'TODOS'
+    ? dados
+    : dados.filter(
+        r => String(r.uf).trim() === ufFilter
+      ),
+  [dados, ufFilter]
+)
 
   // ── Global KPIs
   const gtotal    = f07.length
