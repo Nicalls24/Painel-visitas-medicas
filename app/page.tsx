@@ -478,8 +478,13 @@ const f07 = useMemo(() =>
             padding: '8px 20px', borderRadius: 9, cursor: 'pointer', transition: 'all .2s',
           }}>
             {loading ? 'Lendo…' : '+ Carregar Planilhas'}
-            <input type="file" accept=".xlsx,.xls" multiple
-              style={{ display: 'none' }} onChange={handleFiles} />
+            <input
+  type="file"
+  accept=".xlsx,.xls"
+  multiple
+  style={{ display: 'none' }}
+  onChange={() => {}}
+/>
           </label>
         </div>
       </div>
