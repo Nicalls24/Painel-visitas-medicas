@@ -293,7 +293,7 @@ export default function VisitasPage() {
   const [loading,    setLoading]    = useState(false)
   const [período,    setPeriodo]    = useState('HOJE')
   const [ufFiltro,   setUfFiltro]   = useState('TODOS')
-  const [abaSel,     setAbaSel]     = useState('ranking') // ranking | unidades | criticas | ufs
+  const [abaSel,     setAbaSel]     = useState('unidades') // unidades | criticas | ufs
   const [uploadInfo, setUploadInfo] = useState('')
 
   // ── Upload: aceita múltiplos arquivos
@@ -636,10 +636,9 @@ export default function VisitasPage() {
           {/* ── Abas ── */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
             {[
-              { key: 'ranking',  label: '📊 SLA Ranking'     },
-              { key: 'unidades', label: '📋 Por Unidade'      },
-              { key: 'criticas', label: '🚨 Postos Críticos'  },
-              { key: 'ufs',      label: '📍 Por UF'           },
+              { key: 'unidades', label: '📋 Por Unidade'     },
+              { key: 'criticas', label: '🚨 Postos Críticos' },
+              { key: 'ufs',      label: '📍 Por UF'          },
             ].map(t => (
               <button key={t.key} onClick={() => setAbaSel(t.key)} className="tab" style={{
                 padding: '9px 18px', borderRadius: 10,
@@ -651,100 +650,71 @@ export default function VisitasPage() {
             ))}
           </div>
 
-          {/* ── Conteúdo da aba ── */}
-          <Card>
-            {abaSel === 'ranking' && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between',
-                  alignItems: 'center', marginBottom: 18 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                    letterSpacing: '.12em', color: C.muted }}>
-                    SLA por Unidade — {unidadeRows.length} unidades · melhor → pior
+          {/* ── Grid de bolinhas por unidade (sempre visível abaixo das abas) ── */}
+          <Card style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between',
+              alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '.12em', color: C.muted }}>
+                SLA por Unidade — {unidadeRows.length} unidades
+              </div>
+              {/* Legenda */}
+              <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                {[
+                  { color: C.green,  label: `≥ ${META}% OK`   },
+                  { color: C.yellow, label: '70–89% Risco'     },
+                  { color: C.red,    label: '< 70% Crítico'    },
+                ].map(l => (
+                  <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: l.color }} />
+                    <span style={{ fontSize: 10, color: C.muted }}>{l.label}</span>
                   </div>
-                  {/* Legenda */}
-                  <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                    {[
-                      { color: C.green,  label: `≥ ${META}% OK`     },
-                      { color: C.yellow, label: '70–89% Em Risco'   },
-                      { color: C.red,    label: '< 70% Crítico'      },
-                    ].map(l => (
-                      <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <div style={{ width: 10, height: 10, borderRadius: 2, background: l.color }} />
-                        <span style={{ fontSize: 10, color: C.muted }}>{l.label}</span>
-                      </div>
-                    ))}
-                    {/* Linha da meta */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <div style={{ width: 2, height: 14, background: C.accent }} />
-                      <span style={{ fontSize: 10, color: C.accent }}>Meta {META}%</span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {[...unidadeRows].sort((a, b) => b.sla - a.sla).map((r, i) => {
+                const color = slaColor(r.sla)
+                return (
+                  <div key={`${r.unidade}${i}`}
+                    title={`${r.unidade}\nSLA: ${r.sla.toFixed(1)}%\n${r.realizadas}/${r.previstas} realizadas`}
+                    style={{
+                      width: 64, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', gap: 5, cursor: 'default',
+                    }}>
+                    {/* Bolinha */}
+                    <div style={{
+                      width: 52, height: 52, borderRadius: '50%',
+                      background: color + '22',
+                      border: `3px solid ${color}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexDirection: 'column',
+                      boxShadow: `0 0 12px ${color}44`,
+                      transition: 'transform .15s',
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
+                      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      <span style={{ fontSize: 10, fontWeight: 900, color, lineHeight: 1 }}>
+                        {r.sla.toFixed(0)}%
+                      </span>
+                    </div>
+                    {/* Nome da unidade */}
+                    <div style={{ fontSize: 8.5, color: C.muted, textAlign: 'center',
+                      lineHeight: 1.3, maxWidth: 62, overflow: 'hidden',
+                      display: '-webkit-box', WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical' as const }}>
+                      {r.unidade}
                     </div>
                   </div>
-                </div>
+                )
+              })}
+            </div>
+          </Card>
 
-                {/* Barra de escala no topo */}
-                <div style={{ display: 'flex', justifyContent: 'space-between',
-                  fontSize: 9, color: C.muted, marginBottom: 6, paddingLeft: ufFiltro === 'TODOS' ? 290 : 240 }}>
-                  {[0,10,20,30,40,50,60,70,80,90,100].map(v => (
-                    <span key={v} style={{ color: v === META ? C.accent : C.muted, fontWeight: v === META ? 700 : 400 }}>
-                      {v}%
-                    </span>
-                  ))}
-                </div>
-
-                <div style={{ overflowY: 'auto', maxHeight: 520 }}>
-                  {[...unidadeRows].sort((a, b) => b.sla - a.sla).map((r, i) => {
-                    const color  = slaColor(r.sla)
-                    const nameW  = ufFiltro === 'TODOS' ? 260 : 210
-                    return (
-                      <div key={`${r.unidade}${i}`} style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        marginBottom: 5, minHeight: 28,
-                      }}>
-                        {/* Nome */}
-                        <div style={{ width: nameW, flexShrink: 0, display: 'flex',
-                          alignItems: 'center', gap: 6 }}>
-                          {ufFiltro === 'TODOS' && (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: C.muted,
-                              minWidth: 28, flexShrink: 0 }}>{r.uf}</span>
-                          )}
-                          <span style={{ fontSize: 11, color: C.sub, overflow: 'hidden',
-                            textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}
-                            title={r.unidade}>{r.unidade}</span>
-                        </div>
-
-                        {/* Barra proporcional */}
-                        <div style={{ flex: 1, position: 'relative', height: 20,
-                          background: C.border, borderRadius: 4, overflow: 'visible' }}>
-                          {/* Linha da meta 90% */}
-                          <div style={{ position: 'absolute', left: `${META}%`,
-                            top: 0, bottom: 0, width: 1.5,
-                            background: C.accent, opacity: .6, zIndex: 2 }} />
-                          {/* Barra de SLA */}
-                          <div style={{
-                            position: 'absolute', left: 0, top: 0, bottom: 0,
-                            width: `${Math.min(r.sla, 100)}%`,
-                            background: color, borderRadius: 4,
-                            transition: 'width .5s ease',
-                          }} />
-                        </div>
-
-                        {/* Percentual */}
-                        <div style={{ width: 48, flexShrink: 0, textAlign: 'right',
-                          fontSize: 12, fontWeight: 800, color }}>
-                          {r.sla.toFixed(1)}%
-                        </div>
-
-                        {/* Realizadas/Previstas */}
-                        <div style={{ width: 80, flexShrink: 0, textAlign: 'right',
-                          fontSize: 10, color: C.muted, whiteSpace: 'nowrap' }}>
-                          {r.realizadas}/{r.previstas}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </>
-            )}
+          {/* ── Conteúdo das abas ── */}
+          <Card>
             {abaSel === 'unidades' && (
               <>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
