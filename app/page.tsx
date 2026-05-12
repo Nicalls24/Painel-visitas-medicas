@@ -256,13 +256,49 @@ function GaugeStrip({ pct }: { pct: number }) {
 
 // ─── Main Component ───────────────────────────────────────
 export default function Page() {
-  const [total07, setTotal07] = useState<Row[]>([])
-  const [pend12,  setPend12]  = useState<Row[]>([])
+const [dados, setDados] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [ufFilter, setUfFilter] = useState('TODOS')
   const [tab, setTab] = useState<'unidades' | 'postos' | 'ufs'>('unidades')
+  useEffect(() => {
 
-  const loaded = total07.length > 0
+  async function carregarDados() {
+
+    const { data, error } = await supabase
+      .from('visitas_medicas')
+      .select('*')
+
+    if (!error && data) {
+      setDados(data)
+    }
+  }
+
+  carregarDados()
+
+  const channel = supabase
+    .channel('realtime-visitas')
+
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'visitas_medicas'
+      },
+      () => {
+        carregarDados()
+      }
+    )
+
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+
+}, [])
+
+ const loaded = dados.length > 0
 
   // ── Upload handler
   const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
