@@ -323,7 +323,8 @@ const [dados, setDados] = useState<any[]>([])
       readXlsx(f07),
       readXlsx(f12)
     ])
-
+console.log('07H', r07[0])
+console.log('12H', r12[0])
     const previstasPorUnidade = new Map()
     const pendentesPorUnidade = new Map()
 
