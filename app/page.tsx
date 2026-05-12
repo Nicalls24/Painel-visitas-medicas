@@ -31,17 +31,12 @@ const C = {
 const META = 90
 
 // ─── Helpers ─────────────────────────────────────────────
-// Extrai data do nome do arquivo — aceita ambos os formatos:
-// "VisitasMedicas_07H_12_05.xlsx"  (underscores, original)
-// "VisitasMedicas 07H 12.05.xlsx"  (espaços e ponto, Windows)
 const extractDateFromName = (name: string): string | null => {
-  // Formato underscore: _DD_MM
   const m1 = name.match(/_(\d{2})_(\d{2})\./);
   if (m1) {
     const year = new Date().getFullYear()
     return `${year}-${m1[2]}-${m1[1]}`
   }
-  // Formato Windows com espaço e ponto: " DD.MM."
   const m2 = name.match(/\s(\d{2})\.(\d{2})\./);
   if (m2) {
     const year = new Date().getFullYear()
@@ -50,20 +45,16 @@ const extractDateFromName = (name: string): string | null => {
   return null
 }
 
-// Extrai hora do nome — aceita ambos os formatos
-// "07H_" ou "07H "
 const extractHourFromName = (name: string): number | null => {
   const m = name.match(/(\d{2})H[\s_]/i)
   return m ? parseInt(m[1]) : null
 }
 
-// É arquivo de 07h (previstas) ou 12h (pendentes)?
 const isPrevistas = (name: string): boolean => {
   const h = extractHourFromName(name)
   return h !== null && h < 12
 }
 
-// Lê arquivo xlsx ou csv e retorna rows
 const parseFile = async (file: File): Promise<Record<string, string>[]> => {
   const name = file.name
   const isXlsx = name.toLowerCase().endsWith('.xlsx') || name.toLowerCase().endsWith('.xls')
@@ -80,7 +71,6 @@ const parseFile = async (file: File): Promise<Record<string, string>[]> => {
     raw = parseCSV(text, ';')
   }
 
-  // Encontra a linha do header: primeira linha que contém 'UF' ou 'UNIDADE'
   const headerIdx = raw.findIndex(row =>
     row.some(cell => String(cell).trim().toUpperCase() === 'UF' ||
                      String(cell).trim().toUpperCase() === 'UNIDADE')
@@ -96,11 +86,9 @@ const parseFile = async (file: File): Promise<Record<string, string>[]> => {
     return obj
   })
 
-  // Filtra linhas válidas: UNIDADE preenchida e não é o próprio header repetido
   return rows.filter(r => r['UNIDADE'] && r['UNIDADE'] !== 'UNIDADE')
 }
 
-// Data hoje e ontem no horário local
 const localDateStr = (offset = 0): string => {
   const d = new Date()
   d.setDate(d.getDate() + offset)
@@ -288,15 +276,13 @@ function UnidadeTable({ rows, showUF }: { rows: UnidadeRow[]; showUF: boolean })
 
 // ─── Main ─────────────────────────────────────────────────
 export default function VisitasPage() {
-  // snapshots: { date: 'YYYY-MM-DD', previstas: Row[], pendentes: Row[] }[]
   const [snapshots,  setSnapshots]  = useState<Snapshot[]>([])
   const [loading,    setLoading]    = useState(false)
   const [período,    setPeriodo]    = useState('HOJE')
   const [ufFiltro,   setUfFiltro]   = useState('TODOS')
-  const [abaSel,     setAbaSel]     = useState('unidades') // unidades | criticas | ufs
+  const [abaSel,     setAbaSel]     = useState('unidades')
   const [uploadInfo, setUploadInfo] = useState('')
 
-  // ── Upload: aceita múltiplos arquivos
   const handleFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[]
     if (!files.length) return
@@ -305,7 +291,6 @@ export default function VisitasPage() {
       const newSnaps: Record<string, Snapshot> = {}
 
       for (const file of files) {
-        // Usa só o nome base do arquivo (sem path)
         const fname = file.name.split('/').pop() || file.name
         const date  = extractDateFromName(fname)
 
@@ -324,7 +309,6 @@ export default function VisitasPage() {
         else        newSnaps[date].pendentes = rows
       }
 
-      // Mescla com snapshots anteriores
       setSnapshots(prev => {
         const merged: Record<string, Snapshot> = prev.reduce((a, s) => ({ ...a, [s.date]: s }), {} as Record<string, Snapshot>)
         Object.entries(newSnaps).forEach(([date, snap]) => {
@@ -342,17 +326,13 @@ export default function VisitasPage() {
     } finally { setLoading(false) }
   }, [])
 
-  // ── Snapshots filtrados pelo período selecionado
   const filteredSnaps = useMemo(() =>
     snapshots.filter(s => filterByPeriodo(s.date, período)),
     [snapshots, período])
 
-  // ── Combina todos os dias filtrados em uma visão única
-  // Se Hoje: só hoje. Se Semana: agrega todos os dias da semana.
   const agregado = useMemo(() => {
     if (!filteredSnaps.length) return { previstas: [], pendentes: [], dates: [] }
 
-    // Para cada unidade, soma previstas e pendentes de todos os dias filtrados
     const prevMap: Record<string, { uf: string; unidade: string; count: number }> = {}
     const pendMap: Record<string, { uf: string; unidade: string; count: number }> = {}
 
@@ -380,14 +360,12 @@ export default function VisitasPage() {
     }
   }, [filteredSnaps, ufFiltro])
 
-  // ── Métricas gerais
   const totalPrevistas  = agregado.totalPrev  || 0
   const totalPendentes  = agregado.totalPend  || 0
   const totalRealizadas = Math.max(0, totalPrevistas - totalPendentes)
   const slaGeral        = totalPrevistas > 0 ? (totalRealizadas / totalPrevistas) * 100 : 0
   const faltamMeta      = Math.max(0, Math.ceil(totalPrevistas * META / 100) - totalRealizadas)
 
-  // ── Por unidade
   const unidadeRows = useMemo(() => {
     const { prevMap = {}, pendMap = {} } = agregado
     const all = Object.entries(prevMap).map(([key, p]) => {
@@ -399,12 +377,10 @@ export default function VisitasPage() {
     return all.sort((a, b) => a.sla - b.sla)
   }, [agregado])
 
-  // Críticas (<META), em risco (70–META), ok (>=META)
   const criticas  = unidadeRows.filter(r => r.sla <  70)
   const emRisco   = unidadeRows.filter(r => r.sla >= 70 && r.sla < META)
   const ok        = unidadeRows.filter(r => r.sla >= META)
 
-  // ── Por UF
   const ufRows = useMemo(() => {
     const m: Record<string, { uf: string; previstas: number; pendentes: number; realizadas: number }> = {}
     for (const r of unidadeRows) {
@@ -418,13 +394,11 @@ export default function VisitasPage() {
     })).sort((a, b) => a.sla - b.sla)
   }, [unidadeRows])
 
-  // ── UFs disponíveis
   const ufsDisp = useMemo(() => {
     const s = new Set(snapshots.flatMap(s => [...s.previstas, ...s.pendentes].map(r => r.UF)).filter(u => u && u.trim()))
     return [...s].sort()
   }, [snapshots])
 
-  // ── Label do período
   const períodoLabel = useMemo(() => {
     const dates = filteredSnaps.map(s => s.date).sort()
     if (!dates.length) return 'sem dados'
@@ -650,8 +624,64 @@ export default function VisitasPage() {
             ))}
           </div>
 
-          {/* ── Grid de bolinhas por unidade (sempre visível abaixo das abas) ── */}
+          {/* ── Conteúdo das abas (AGORA PRIMEIRO) ── */}
           <Card style={{ marginBottom: 14 }}>
+            {abaSel === 'unidades' && (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '.12em', color: C.muted, marginBottom: 14 }}>
+                  Todas as Unidades — ordenadas por SLA (pior → melhor)
+                </div>
+                <UnidadeTable rows={unidadeRows} showUF={ufFiltro === 'TODOS'} />
+              </>
+            )}
+            {abaSel === 'criticas' && (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '.12em', color: C.muted, marginBottom: 14 }}>
+                  🚨 Postos Críticos (SLA &lt; {META}%) — {criticas.length + emRisco.length} unidades
+                </div>
+                <UnidadeTable rows={[...criticas, ...emRisco]} showUF={ufFiltro === 'TODOS'} />
+              </>
+            )}
+            {abaSel === 'ufs' && (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '.12em', color: C.muted, marginBottom: 14 }}>
+                  SLA por Estado (UF)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                  {ufRows.map(r => {
+                    const color = slaColor(r.sla)
+                    const pct   = r.previstas > 0 ? (r.realizadas / r.previstas) * 100 : 0
+                    return (
+                      <div key={r.uf} style={{ background: C.card2,
+                        border: `1px solid ${color}33`, borderLeft: `4px solid ${color}`,
+                        borderRadius: 10, padding: '14px 16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between',
+                          alignItems: 'center', marginBottom: 10 }}>
+                          <span style={{ fontSize: 16, fontWeight: 900, color: C.text }}>{r.uf}</span>
+                          <span style={{ fontSize: 18, fontWeight: 900, color }}>{r.sla.toFixed(1)}%</span>
+                        </div>
+                        <div style={{ background: C.border, borderRadius: 99, height: 6, overflow: 'hidden', marginBottom: 8 }}>
+                          <div style={{ height: '100%', borderRadius: 99, background: color,
+                            width: `${Math.min(pct, 100)}%` }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.muted }}>
+                          <span>✅ {r.realizadas}</span>
+                          <span>📋 {r.previstas}</span>
+                          <span style={{ color: C.red }}>⏳ {r.pendentes}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </Card>
+
+          {/* ── Grid de bolinhas por unidade (AGORA SEGUNDO) ── */}
+          <Card style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between',
               alignItems: 'center', marginBottom: 14 }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
@@ -707,62 +737,6 @@ export default function VisitasPage() {
                 )
               })}
             </div>
-          </Card>
-
-          {/* ── Conteúdo das abas ── */}
-          <Card style={{ marginBottom: 16 }}>
-            {abaSel === 'unidades' && (
-              <>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                  letterSpacing: '.12em', color: C.muted, marginBottom: 14 }}>
-                  Todas as Unidades — ordenadas por SLA (pior → melhor)
-                </div>
-                <UnidadeTable rows={unidadeRows} showUF={ufFiltro === 'TODOS'} />
-              </>
-            )}
-            {abaSel === 'criticas' && (
-              <>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                  letterSpacing: '.12em', color: C.muted, marginBottom: 14 }}>
-                  🚨 Postos Críticos (SLA &lt; {META}%) — {criticas.length + emRisco.length} unidades
-                </div>
-                <UnidadeTable rows={[...criticas, ...emRisco]} showUF={ufFiltro === 'TODOS'} />
-              </>
-            )}
-            {abaSel === 'ufs' && (
-              <>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-                  letterSpacing: '.12em', color: C.muted, marginBottom: 14 }}>
-                  SLA por Estado (UF)
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
-                  {ufRows.map(r => {
-                    const color = slaColor(r.sla)
-                    const pct   = r.previstas > 0 ? (r.realizadas / r.previstas) * 100 : 0
-                    return (
-                      <div key={r.uf} style={{ background: C.card2,
-                        border: `1px solid ${color}33`, borderLeft: `4px solid ${color}`,
-                        borderRadius: 10, padding: '14px 16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between',
-                          alignItems: 'center', marginBottom: 10 }}>
-                          <span style={{ fontSize: 16, fontWeight: 900, color: C.text }}>{r.uf}</span>
-                          <span style={{ fontSize: 18, fontWeight: 900, color }}>{r.sla.toFixed(1)}%</span>
-                        </div>
-                        <div style={{ background: C.border, borderRadius: 99, height: 6, overflow: 'hidden', marginBottom: 8 }}>
-                          <div style={{ height: '100%', borderRadius: 99, background: color,
-                            width: `${Math.min(pct, 100)}%` }} />
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.muted }}>
-                          <span>✅ {r.realizadas}</span>
-                          <span>📋 {r.previstas}</span>
-                          <span style={{ color: C.red }}>⏳ {r.pendentes}</span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </>
-            )}
           </Card>
 
           {/* Footer */}
