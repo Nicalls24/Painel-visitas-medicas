@@ -57,31 +57,36 @@ const parseFile = async (file: File): Promise<Record<string, string>[]> => {
   const name = file.name
   const isXlsx = name.toLowerCase().endsWith('.xlsx') || name.toLowerCase().endsWith('.xls')
 
-  let rows: Record<string, string>[] = []
+  let raw: string[][] = []
+
   if (isXlsx) {
     const buf = await file.arrayBuffer()
     const wb  = XLSX.read(buf, { type: 'buffer' })
     const ws  = wb.Sheets[wb.SheetNames[0]]
-    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
-    // Primeira linha real é o header (UF, UNIDADE, POSTO…)
-    const header = raw[1] || raw[0]
-    rows = raw.slice(header === raw[0] ? 1 : 2).map(r => {
-      const obj: Record<string, string> = {}
-      header.forEach((h, i) => { obj[String(h).trim()] = String(r[i] ?? '').trim() })
-      return obj
-    })
+    raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
   } else {
-    // CSV com separador ;
     const text = await file.text()
-    const raw  = parseCSV(text, ';')
-    const header = raw[1] || raw[0]
-    rows = raw.slice(header === raw[0] ? 1 : 2).map(r => {
-      const obj: Record<string, string> = {}
-      header.forEach((h, i) => { obj[String(h).trim()] = String(r[i] ?? '').trim() })
-      return obj
-    })
+    raw = parseCSV(text, ';')
   }
-  return rows.filter(r => r['UF'] && r['UF'] !== 'UF')
+
+  // Encontra a linha do header: primeira linha que contém 'UF' ou 'UNIDADE'
+  const headerIdx = raw.findIndex(row =>
+    row.some(cell => String(cell).trim().toUpperCase() === 'UF' ||
+                     String(cell).trim().toUpperCase() === 'UNIDADE')
+  )
+  if (headerIdx < 0) return []
+
+  const header = raw[headerIdx].map(h => String(h).trim())
+  const dataRows = raw.slice(headerIdx + 1)
+
+  const rows: Record<string, string>[] = dataRows.map(r => {
+    const obj: Record<string, string> = {}
+    header.forEach((h, i) => { obj[h] = String(r[i] ?? '').trim() })
+    return obj
+  })
+
+  // Filtra linhas válidas: UF preenchida e não é o próprio header repetido
+  return rows.filter(r => r['UF'] && r['UF'] !== 'UF' && r['UF'].length <= 3)
 }
 
 // Data hoje e ontem no horário local
