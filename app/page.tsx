@@ -290,6 +290,11 @@ export default function VisitasPage() {
     const files = Array.from(e.target.files || []) as File[]
     if (!files.length) return
     setLoading(true)
+
+    // DEBUG: mostra os nomes exatos que o browser enviou
+    const nomes = files.map(f => f.name).join('\n')
+    alert('Nomes recebidos:\n' + nomes)
+
     try {
       const newSnaps: Record<string, Snapshot> = {}
 
