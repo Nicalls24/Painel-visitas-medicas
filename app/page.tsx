@@ -2,7 +2,14 @@
 
 import { useMemo, useState, useCallback } from 'react'
 import * as XLSX from 'xlsx'
-import Papa from 'papaparse'
+
+// Parser CSV nativo (sem dependência externa)
+const parseCSV = (text, delimiter = ';') => {
+  return text
+    .split('\n')
+    .map(line => line.split(delimiter).map(cell => cell.trim().replace(/^"|"$/g, '')))
+    .filter(row => row.some(cell => cell !== ''))
+}
 
 // ─── Palette ──────────────────────────────────────────────
 const C = {
@@ -66,8 +73,7 @@ const parseFile = async (file) => {
   } else {
     // CSV com separador ;
     const text = await file.text()
-    const result = Papa.parse(text, { delimiter: ';', skipEmptyLines: true })
-    const raw  = result.data
+    const raw  = parseCSV(text, ';')
     const header = raw[1] || raw[0]
     rows = raw.slice(header === raw[0] ? 1 : 2).map(r => {
       const obj = {}
