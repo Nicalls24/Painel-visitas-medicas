@@ -286,30 +286,50 @@ export default function VisitasPage() {
   const [uploadInfo, setUploadInfo] = useState('')
 
   // ── Upload: aceita múltiplos arquivos
-  const handleFiles = useCallback(async (e) => {
+  const handleFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[]
     if (!files.length) return
     setLoading(true)
     try {
-      const newSnaps: Record<string, Snapshot> = { ...snapshots.reduce((a, s) => ({ ...a, [s.date]: s }), {} as Record<string, Snapshot>) }
+      const newSnaps: Record<string, Snapshot> = {}
 
       for (const file of files) {
-        const date = extractDateFromName(file.name)
-        if (!date) { console.warn('Não foi possível extrair data de:', file.name); continue }
+        // Usa só o nome base do arquivo (sem path)
+        const fname = file.name.split('/').pop() || file.name
+        const date  = extractDateFromName(fname)
 
-        const isPrev = isPrevistas(file.name)
+        if (!date) {
+          console.warn('Data não encontrada no nome:', fname)
+          continue
+        }
+
+        const isPrev = isPrevistas(fname)
         const rows   = await parseFile(file)
+
+        console.log(`[Visitas] ${fname} → date=${date} isPrev=${isPrev} rows=${rows.length}`)
 
         if (!newSnaps[date]) newSnaps[date] = { date, previstas: [], pendentes: [] }
         if (isPrev) newSnaps[date].previstas = rows
         else        newSnaps[date].pendentes = rows
       }
 
-      const snapArr = Object.values(newSnaps).sort((a, b) => a.date.localeCompare(b.date))
-      setSnapshots(snapArr)
-      setUploadInfo(`${files.length} arquivo(s) carregado(s) · datas: ${[...new Set(files.map(f => fmtDate(extractDateFromName(f.name))).filter(Boolean))].join(', ')}`)
+      // Mescla com snapshots anteriores
+      setSnapshots(prev => {
+        const merged: Record<string, Snapshot> = prev.reduce((a, s) => ({ ...a, [s.date]: s }), {} as Record<string, Snapshot>)
+        Object.entries(newSnaps).forEach(([date, snap]) => {
+          if (!merged[date]) merged[date] = snap
+          else {
+            if (snap.previstas.length) merged[date].previstas = snap.previstas
+            if (snap.pendentes.length) merged[date].pendentes = snap.pendentes
+          }
+        })
+        return Object.values(merged).sort((a, b) => a.date.localeCompare(b.date))
+      })
+
+      const datesLoaded = [...new Set(Object.keys(newSnaps).map(d => fmtDate(d)).filter(Boolean))].join(', ')
+      setUploadInfo(`${files.length} arquivo(s) · datas: ${datesLoaded || '(nenhuma data detectada)'}`)
     } finally { setLoading(false) }
-  }, [snapshots])
+  }, [])
 
   // ── Snapshots filtrados pelo período selecionado
   const filteredSnaps = useMemo(() =>
@@ -401,7 +421,8 @@ export default function VisitasPage() {
     return `${fmtDate(dates[0])} → ${fmtDate(dates[dates.length-1])}`
   }, [filteredSnaps])
 
-  const hasData = snapshots.length > 0
+  const hasData       = snapshots.length > 0
+  const hasFiltered   = filteredSnaps.length > 0
 
   return (
     <div style={{ background: C.bg, minHeight: '100vh',
@@ -493,7 +514,26 @@ export default function VisitasPage() {
           </div>
         )}
 
-        {hasData && (<>
+        {hasData && !hasFiltered && (
+          <div style={{ minHeight: 'calc(100vh - 110px)', display: 'flex',
+            flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            <div style={{ fontSize: 48 }}>🔍</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>Sem dados para este período</div>
+            <div style={{ color: C.muted, fontSize: 13 }}>
+              Os arquivos carregados cobrem:{' '}
+              <strong style={{ color: C.sub }}>
+                {snapshots.map(s => fmtDate(s.date)).join(', ')}
+              </strong>
+            </div>
+            <button onClick={() => setPeriodo('TODOS')} style={{
+              background: `linear-gradient(135deg,${C.accent},${C.accentB})`,
+              color: '#000', fontWeight: 700, fontSize: 13,
+              padding: '9px 20px', borderRadius: 9, border: 'none', cursor: 'pointer',
+            }}>Ver Todos os Dados</button>
+          </div>
+        )}
+
+        {hasData && hasFiltered && (<>
           {/* ── Hero: SLA Geral ── */}
           <div style={{ background: `linear-gradient(135deg,#0a1628,#0d1e35)`,
             border: `1px solid ${C.border}`, borderRadius: 16, padding: '28px 32px',
