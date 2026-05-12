@@ -96,8 +96,8 @@ const parseFile = async (file: File): Promise<Record<string, string>[]> => {
     return obj
   })
 
-  // Filtra linhas válidas: UF preenchida e não é o próprio header repetido
-  return rows.filter(r => r['UF'] && r['UF'] !== 'UF' && r['UF'].length <= 3)
+  // Filtra linhas válidas: UNIDADE preenchida e não é o próprio header repetido
+  return rows.filter(r => r['UNIDADE'] && r['UNIDADE'] !== 'UNIDADE')
 }
 
 // Data hoje e ontem no horário local
