@@ -4,8 +4,8 @@ import { useMemo, useState, useCallback, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 
 // ─── Supabase ─────────────────────────────────────────────
-const SB_URL = 'https://fwdvzsywudpieqlqnxkp.supabase.co'
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3ZHZ6c3l3dWRwaWVxbHFueGtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1ODcyNzEsImV4cCI6MjA5NDE2MzI3MX0.SkyfE_HVulz_TyQldI6XpENSJAuu6xDgUEDz4vObKYQ'
+const SB_URL = 'https://tdoubfwlpfcyxqfqyppb.supabase.co'
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkb3ViZndscGZjeXhxZnF5cHBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjI1MDEsImV4cCI6MjA5NDA5ODUwMX0.stw5t_YY_IqyIEQv7sabN8lfpo5PF-9sKgHvYkRJLTI'
 const TABLE  = 'visitas_medicas'
 
 const sbFetch = (path: string, opts: RequestInit = {}) => {
