@@ -150,8 +150,14 @@ const filterByPeriodo = (dateStr: string, período: string): boolean => {
 }
 
 // ─── SLA helpers ──────────────────────────────────────────
-const slaColor = (pct: number) => pct >= META ? C.green : pct >= 70 ? C.yellow : C.red
-const slaLabel = (pct: number) => pct >= META ? 'OK' : pct >= 70 ? 'Em Risco' : 'Crítico'
+const slaColor = (pct: number) => {
+  const rounded = Math.round(pct * 10) / 10
+  return rounded >= META ? C.green : rounded >= 70 ? C.yellow : C.red
+}
+const slaLabel = (pct: number) => {
+  const rounded = Math.round(pct * 10) / 10
+  return rounded >= META ? 'OK' : rounded >= 70 ? 'Em Risco' : 'Crítico'
+}
 
 // ─── Types ────────────────────────────────────────────────
 interface DbRow {
