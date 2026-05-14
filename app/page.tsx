@@ -150,14 +150,9 @@ const filterByPeriodo = (dateStr: string, período: string): boolean => {
 }
 
 // ─── SLA helpers ──────────────────────────────────────────
-const slaColor = (pct: number) => {
-  const rounded = Math.round(pct * 10) / 10
-  return rounded >= META ? C.green : rounded >= 70 ? C.yellow : C.red
-}
-const slaLabel = (pct: number) => {
-  const rounded = Math.round(pct * 10) / 10
-  return rounded >= META ? 'OK' : rounded >= 70 ? 'Em Risco' : 'Crítico'
-}
+const roundSla = (pct: number) => Math.round(pct * 10) / 10
+const slaColor = (pct: number) => roundSla(pct) >= META ? C.green : roundSla(pct) >= 70 ? C.yellow : C.red
+const slaLabel = (pct: number) => roundSla(pct) >= META ? 'OK' : roundSla(pct) >= 70 ? 'Em Risco' : 'Crítico'
 
 // ─── Types ────────────────────────────────────────────────
 interface DbRow {
@@ -452,7 +447,7 @@ export default function VisitasPage() {
       m[r.unidade].realizadas += r.realizadas
     }
     return Object.values(m).map(r => ({
-      ...r, sla: r.previstas > 0 ? (r.realizadas / r.previstas) * 100 : 0
+      ...r, sla: r.previstas > 0 ? Math.round((r.realizadas / r.previstas) * 1000) / 10 : 0
     })).sort((a, b) => a.sla - b.sla)
   }, [filtered])
 
@@ -759,7 +754,7 @@ export default function VisitasPage() {
                       flexDirection: 'column', boxShadow: `0 0 12px ${color}44`, transition: 'transform .15s' }}
                       onMouseEnter={e => (e.currentTarget.style.transform='scale(1.15)')}
                       onMouseLeave={e => (e.currentTarget.style.transform='scale(1)')}>
-                      <span style={{ fontSize: 10, fontWeight: 900, color, lineHeight: 1 }}>{r.sla.toFixed(0)}%</span>
+                      <span style={{ fontSize: 10, fontWeight: 900, color, lineHeight: 1 }}>{roundSla(r.sla).toFixed(0)}%</span>
                     </div>
                     <div style={{ fontSize: 8.5, color: C.muted, textAlign: 'center', lineHeight: 1.3, maxWidth: 62,
                       overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
