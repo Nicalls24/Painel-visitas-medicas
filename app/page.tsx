@@ -445,28 +445,33 @@ function TendenciaChart({ dbRows, filtDates, ufFiltro }: {
       </div>
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
-        {modoVis === 'real' ? [
+      {(() => {
+        const kpis = modoVis === 'real' ? [
           { label:'SLA Atual',  value:`${lastSla.toFixed(1)}%`, color: lastSla>=META ? '#10B981':'#F59E0B' },
           { label:'Variação',   value:`${trend>=0?'+':''}${trend.toFixed(1)}pp`, color:trendColor },
           { label:'Melhor Dia', value:`${slaVals.length?Math.max(...slaVals).toFixed(1):0}%`, color:'#10B981' },
           { label:'Pior Dia',   value:`${slaVals.length?Math.min(...slaVals).toFixed(1):0}%`, color:'#EF4444' },
         ] : [
-          { label:'Projeção amanhã',   value:`${projSlaAmanha.toFixed(1)}%`,  color:'#00C6FF' },
-          { label:`Projeção +5 dias`,  value:`${projSla5dias.toFixed(1)}%`,   color:'#00C6FF' },
-          { label:'Tendência diária',  value:`${trend>=0?'+':''}${filtDates.length>1?(trend/(filtDates.length-1)).toFixed(1):0}pp`, color:trendColor },
-          { label:'Atinge meta em',    value: diasParaMeta ? `~${diasParaMeta}d` : lastSla>=META ? 'Atingida!' : '—', color: diasParaMeta ? '#F59E0B' : lastSla>=META ? '#10B981':'#EF4444' },
-        ]}.map(k => (
-          <div key={k.label} style={{ background:'#0D1525', border:`1px solid ${modoVis==='proj'?'#00C6FF22':'#172438'}`, borderRadius:10, padding:'12px 14px' }}>
-            <div style={{ fontSize:9, color:'#4A6A88', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:6 }}>{k.label}</div>
-            <div style={{ fontSize:22, fontWeight:900, color:k.color }}>{k.value}</div>
+          { label:'Projeção amanhã',  value:`${projSlaAmanha.toFixed(1)}%`, color:'#00C6FF' },
+          { label:'Projeção +5 dias', value:`${projSla5dias.toFixed(1)}%`,  color:'#00C6FF' },
+          { label:'Tendência diária', value:`${trend>=0?'+':''}${filtDates.length>1?(trend/(filtDates.length-1)).toFixed(1):0}pp`, color:trendColor },
+          { label:'Atinge meta em',   value: diasParaMeta ? `~${diasParaMeta}d` : lastSla>=META ? 'Atingida!' : '—', color: diasParaMeta ? '#F59E0B' : lastSla>=META ? '#10B981':'#EF4444' },
+        ]
+        return (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
+            {kpis.map(k => (
+              <div key={k.label} style={{ background:'#0D1525', border:`1px solid ${modoVis==='proj'?'#00C6FF22':'#172438'}`, borderRadius:10, padding:'12px 14px' }}>
+                <div style={{ fontSize:9, color:'#4A6A88', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:6 }}>{k.label}</div>
+                <div style={{ fontSize:22, fontWeight:900, color:k.color }}>{k.value}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {/* Legenda */}
-      <div style={{ display:'flex', gap:16, marginBottom:10, flexWrap:'wrap' }}>
-        {modoVis === 'real' ? [
+      {(() => {
+        const items = modoVis === 'real' ? [
           { color:'#10B981', label:'SLA %', dash:false },
           { color:'#00C6FF', label:'Meta 90%', dash:true },
           { color:'#EF4444', label:'Pendentes (eixo direito)', dash:false },
@@ -475,13 +480,18 @@ function TendenciaChart({ dbRows, filtDates, ufFiltro }: {
           { color:'#00C6FF',   label:'Projeção SLA', dash:true },
           { color:'#4A6A88',   label:'Meta 90%', dash:true },
           { color:'#EF4444',   label:'Projeção pendentes (eixo dir.)', dash:true },
-        ]}.map(l => (
-          <div key={l.label} style={{ display:'flex', alignItems:'center', gap:6 }}>
-            <div style={{ width:20, height: l.dash?0:3, borderRadius:99, background:l.dash?'transparent':l.color, border:l.dash?`1.5px dashed ${l.color}`:'none' }} />
-            <span style={{ fontSize:11, color:'#7FA8C4' }}>{l.label}</span>
+        ]
+        return (
+          <div style={{ display:'flex', gap:16, marginBottom:10, flexWrap:'wrap' }}>
+            {items.map(l => (
+              <div key={l.label} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <div style={{ width:20, height:l.dash?0:3, borderRadius:99, background:l.dash?'transparent':l.color, border:l.dash?`1.5px dashed ${l.color}`:'none' }} />
+                <span style={{ fontSize:11, color:'#7FA8C4' }}>{l.label}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {/* Gráfico principal */}
       <div style={{ position:'relative', height:280, marginBottom:16 }}>
