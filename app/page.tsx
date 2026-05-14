@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useCallback, useEffect } from 'react'
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 
 // ─── Supabase ─────────────────────────────────────────────
@@ -270,6 +270,210 @@ function UnidadeTable({ rows, showUF }: { rows: UnidadeRow[]; showUF: boolean })
 }
 
 // ─── Main ─────────────────────────────────────────────────
+// ─── Tendência Chart ──────────────────────────────────────
+function TendenciaChart({ dbRows, filtDates, ufFiltro }: {
+  dbRows: DbRow[]; filtDates: string[]; ufFiltro: string
+}) {
+  const chartRef = useRef<HTMLCanvasElement>(null)
+  const chartInst = useRef<any>(null)
+
+  // Calcula SLA por dia usando os dias do filtro atual
+  const dayData = useMemo(() => {
+    return filtDates.map(date => {
+      const rows = dbRows.filter(r =>
+        r.data === date && (ufFiltro === 'TODOS' || r.uf === ufFiltro)
+      )
+      const prev = rows.reduce((a, r) => a + r.previstas,  0)
+      const real = rows.reduce((a, r) => a + r.realizadas, 0)
+      const pend = rows.reduce((a, r) => a + r.pendentes,  0)
+      const crit = rows.filter(r => r.previstas > 0 && (r.realizadas / r.previstas) * 100 < META).length
+      const sla  = prev > 0 ? (real / prev) * 100 : 0
+      return { date, sla, prev, real, pend, crit }
+    })
+  }, [dbRows, filtDates, ufFiltro])
+
+  const labels = dayData.map(d => d.date.slice(5).split('-').reverse().join('/'))
+  const slaVals = dayData.map(d => parseFloat(d.sla.toFixed(1)))
+  const pendVals = dayData.map(d => d.pend)
+  const critVals = dayData.map(d => d.crit)
+
+  const lastSla = slaVals[slaVals.length - 1] ?? 0
+  const firstSla = slaVals[0] ?? 0
+  const trend = lastSla - firstSla
+
+  useEffect(() => {
+    if (!chartRef.current) return
+    if (chartInst.current) { chartInst.current.destroy(); chartInst.current = null }
+
+    const ctx = chartRef.current.getContext('2d')
+    if (!ctx) return
+
+    const grad = ctx.createLinearGradient(0, 0, 0, 260)
+    grad.addColorStop(0, '#10B98155')
+    grad.addColorStop(1, '#10B98100')
+
+    const pendGrad = ctx.createLinearGradient(0, 0, 0, 260)
+    pendGrad.addColorStop(0, '#EF444433')
+    pendGrad.addColorStop(1, '#EF444400')
+
+    chartInst.current = new (window as any).Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'SLA %',
+            data: slaVals,
+            borderColor: '#10B981',
+            borderWidth: 2.5,
+            backgroundColor: grad,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#10B981',
+            pointBorderColor: '#0F1828',
+            pointBorderWidth: 2,
+            yAxisID: 'y',
+          },
+          {
+            label: 'Meta 90%',
+            data: Array(labels.length).fill(90),
+            borderColor: '#00C6FF55',
+            borderWidth: 1.5,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false,
+            yAxisID: 'y',
+          },
+          {
+            label: 'Pendentes',
+            data: pendVals,
+            borderColor: '#EF4444',
+            borderWidth: 2,
+            backgroundColor: pendGrad,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointBackgroundColor: '#EF4444',
+            pointBorderColor: '#0F1828',
+            pointBorderWidth: 2,
+            yAxisID: 'y2',
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0F1828',
+            borderColor: '#172438',
+            borderWidth: 1,
+            titleColor: '#7FA8C4',
+            bodyColor: '#EDF2FF',
+            callbacks: {
+              label: (ctx: any) => {
+                if (ctx.dataset.label === 'Meta 90%') return null
+                if (ctx.dataset.label === 'SLA %') return ` SLA: ${ctx.parsed.y.toFixed(1)}%`
+                return ` Pendentes: ${ctx.parsed.y}`
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#4A6A88', font: { size: 11 }, maxRotation: 45 },
+            grid: { color: '#172438' }
+          },
+          y: {
+            position: 'left',
+            min: 50, max: 100,
+            ticks: { color: '#4A6A88', font: { size: 11 }, callback: (v: any) => v + '%' },
+            grid: { color: '#172438' }
+          },
+          y2: {
+            position: 'right',
+            ticks: { color: '#EF444488', font: { size: 11 } },
+            grid: { drawOnChartArea: false }
+          }
+        }
+      }
+    })
+  }, [dayData])
+
+  const trendColor = trend >= 0 ? '#10B981' : '#EF4444'
+  const trendIcon  = trend >= 0 ? '▲' : '▼'
+
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '.12em', color: '#4A6A88', marginBottom: 16 }}>
+        Evolução Diária — SLA % e Pendentes · {filtDates.length} dia(s)
+      </div>
+
+      {/* Mini KPIs do período */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
+        {[
+          { label: 'SLA Atual',   value: `${lastSla.toFixed(1)}%`,  color: lastSla >= META ? '#10B981' : '#F59E0B' },
+          { label: 'Variação',    value: `${trend >= 0 ? '+' : ''}${trend.toFixed(1)}pp`, color: trendColor },
+          { label: 'Melhor Dia',  value: `${Math.max(...slaVals).toFixed(1)}%`, color: '#10B981' },
+          { label: 'Pior Dia',    value: `${Math.min(...slaVals).toFixed(1)}%`, color: '#EF4444' },
+        ].map(k => (
+          <div key={k.label} style={{ background: '#0D1525', border: '1px solid #172438',
+            borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ fontSize: 10, color: '#4A6A88', textTransform: 'uppercase',
+              letterSpacing: '.08em', marginBottom: 6 }}>{k.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: k.color }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Legenda */}
+      <div style={{ display: 'flex', gap: 18, marginBottom: 12 }}>
+        {[
+          { color: '#10B981', label: 'SLA %', dash: false },
+          { color: '#00C6FF', label: 'Meta 90%', dash: true },
+          { color: '#EF4444', label: 'Pendentes (eixo direito)', dash: false },
+        ].map(l => (
+          <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 20, height: 3, borderRadius: 99,
+              background: l.dash ? 'transparent' : l.color,
+              border: l.dash ? `1.5px dashed ${l.color}` : 'none'
+            }} />
+            <span style={{ fontSize: 11, color: '#7FA8C4' }}>{l.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Gráfico */}
+      <div style={{ position: 'relative', height: 280 }}>
+        <canvas ref={chartRef} role="img"
+          aria-label={`Gráfico de tendência SLA por dia — ${filtDates.length} dias`} />
+      </div>
+
+      {/* Rodapé trend */}
+      <div style={{ marginTop: 14, padding: '10px 14px', background: '#0D1525',
+        borderRadius: 10, border: `1px solid ${trendColor}33`,
+        display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 18, color: trendColor }}>{trendIcon}</span>
+        <span style={{ fontSize: 12, color: '#7FA8C4' }}>
+          SLA {trend >= 0 ? 'subiu' : 'caiu'}{' '}
+          <strong style={{ color: trendColor }}>{Math.abs(trend).toFixed(1)} pontos percentuais</strong>
+          {' '}do primeiro ao último dia do período selecionado.
+          {lastSla < META && (
+            <span style={{ color: '#F59E0B' }}>
+              {' '}Ainda faltam <strong>{(META - lastSla).toFixed(1)}pp</strong> para atingir a meta de {META}%.
+            </span>
+          )}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export default function VisitasPage() {
   const [dbRows,     setDbRows]     = useState<DbRow[]>([])
   const [loading,    setLoading]    = useState(false)
@@ -495,6 +699,7 @@ export default function VisitasPage() {
         .ubtn:hover{opacity:.9;transform:translateY(-1px)}
         .tab:hover{background:${C.border}!important}
       `}</style>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" />
 
       {/* ── Topbar ── */}
       <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`,
@@ -669,7 +874,12 @@ export default function VisitasPage() {
 
           {/* Abas */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-            {[{ key:'unidades',label:'📋 Por Unidade'},{key:'criticas',label:'🚨 Postos Críticos'},{key:'ufs',label:'📍 Por UF'}].map(t => (
+            {[
+              { key:'unidades', label:'📋 Por Unidade'     },
+              { key:'criticas', label:'🚨 Postos Críticos' },
+              { key:'ufs',      label:'📍 Por UF'          },
+              { key:'tendencia',label:'📈 Tendência'       },
+            ].map(t => (
               <button key={t.key} onClick={() => setAbaSel(t.key)} className="tab" style={{
                 padding: '9px 18px', borderRadius: 10,
                 border: `1px solid ${abaSel === t.key ? C.accent : C.border}`,
@@ -696,6 +906,9 @@ export default function VisitasPage() {
                 </div>
                 <UnidadeTable rows={[...criticas, ...emRisco]} showUF={ufFiltro === 'TODOS'} />
               </>
+            )}
+            {abaSel === 'tendencia' && (
+              <TendenciaChart dbRows={dbRows} filtDates={filtDates} ufFiltro={ufFiltro} />
             )}
             {abaSel === 'ufs' && (
               <>
