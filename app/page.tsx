@@ -274,200 +274,262 @@ function UnidadeTable({ rows, showUF }: { rows: UnidadeRow[]; showUF: boolean })
 function TendenciaChart({ dbRows, filtDates, ufFiltro }: {
   dbRows: DbRow[]; filtDates: string[]; ufFiltro: string
 }) {
-  const chartRef = useRef<HTMLCanvasElement>(null)
+  const chartRef  = useRef<HTMLCanvasElement>(null)
   const chartInst = useRef<any>(null)
+  const [modoVis, setModoVis] = useState<'real'|'proj'>('real')
 
-  // Calcula SLA por dia usando os dias do filtro atual
   const dayData = useMemo(() => {
     return filtDates.map(date => {
-      const rows = dbRows.filter(r =>
-        r.data === date && (ufFiltro === 'TODOS' || r.uf === ufFiltro)
-      )
+      const rows = dbRows.filter(r => r.data === date && (ufFiltro === 'TODOS' || r.uf === ufFiltro))
       const prev = rows.reduce((a, r) => a + r.previstas,  0)
       const real = rows.reduce((a, r) => a + r.realizadas, 0)
       const pend = rows.reduce((a, r) => a + r.pendentes,  0)
-      const crit = rows.filter(r => r.previstas > 0 && (r.realizadas / r.previstas) * 100 < META).length
-      const sla  = prev > 0 ? (real / prev) * 100 : 0
-      return { date, sla, prev, real, pend, crit }
+      const sla  = prev > 0 ? parseFloat(((real / prev) * 100).toFixed(1)) : 0
+      return { date, sla, prev, real, pend }
     })
   }, [dbRows, filtDates, ufFiltro])
 
-  const labels = dayData.map(d => d.date.slice(5).split('-').reverse().join('/'))
-  const slaVals = dayData.map(d => parseFloat(d.sla.toFixed(1)))
+  const labels   = dayData.map(d => d.date.slice(5).split('-').reverse().join('/'))
+  const slaVals  = dayData.map(d => d.sla)
   const pendVals = dayData.map(d => d.pend)
-  const critVals = dayData.map(d => d.crit)
-
-  const lastSla = slaVals[slaVals.length - 1] ?? 0
+  const lastSla  = slaVals[slaVals.length - 1] ?? 0
   const firstSla = slaVals[0] ?? 0
-  const trend = lastSla - firstSla
+  const trend    = parseFloat((lastSla - firstSla).toFixed(1))
+  const trendColor = trend >= 0 ? '#10B981' : '#EF4444'
+
+  // Calcula projeção: média móvel 3 dias + inclinação suavizada
+  const projData = useMemo(() => {
+    if (slaVals.length < 2) return []
+    const slope = slaVals.length >= 3
+      ? (slaVals[slaVals.length-1] - slaVals[slaVals.length-3]) / 2
+      : (slaVals[slaVals.length-1] - slaVals[0])
+    const result: (number|null)[] = [...Array(slaVals.length - 1).fill(null), lastSla]
+    for (let i = 1; i <= 5; i++) {
+      const last3 = [...slaVals, ...result.filter(v=>v!==null&&result.indexOf(v)>=slaVals.length-1) as number[]].slice(-3)
+      const avg = last3.reduce((a,b)=>a+b,0)/last3.length
+      result.push(parseFloat(Math.min(99, avg + slope * 0.5).toFixed(1)))
+    }
+    return result
+  }, [slaVals, lastSla])
+
+  const pendProjData = useMemo(() => {
+    if (pendVals.length < 2) return []
+    const slope = pendVals.length >= 3
+      ? (pendVals[pendVals.length-1] - pendVals[pendVals.length-3]) / 2
+      : (pendVals[pendVals.length-1] - pendVals[0])
+    const result: (number|null)[] = [...Array(pendVals.length - 1).fill(null), pendVals[pendVals.length-1]]
+    for (let i = 1; i <= 5; i++) {
+      const prev = result.filter(v=>v!==null).slice(-1)[0] as number
+      result.push(parseFloat(Math.max(0, prev + slope * 0.5).toFixed(0)))
+    }
+    return result
+  }, [pendVals])
+
+  // Gera labels para projeção (+5 dias)
+  const projLabels = useMemo(() => {
+    const last = filtDates[filtDates.length - 1]
+    if (!last) return labels
+    const extra = []
+    for (let i = 1; i <= 5; i++) {
+      const d = new Date(last + 'T00:00:00')
+      d.setDate(d.getDate() + i)
+      extra.push(`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`)
+    }
+    return [...labels, ...extra]
+  }, [labels, filtDates])
+
+  const projSlaAmanha  = projData[slaVals.length]  as number ?? lastSla
+  const projSla5dias   = projData[projData.length-1] as number ?? lastSla
+  const diasParaMeta   = lastSla < META && trend > 0
+    ? Math.ceil((META - lastSla) / (trend / Math.max(filtDates.length-1,1)))
+    : null
 
   useEffect(() => {
     if (!chartRef.current) return
     if (chartInst.current) { chartInst.current.destroy(); chartInst.current = null }
-
     const ctx = chartRef.current.getContext('2d')
     if (!ctx) return
 
-    const grad = ctx.createLinearGradient(0, 0, 0, 260)
-    grad.addColorStop(0, '#10B98155')
-    grad.addColorStop(1, '#10B98100')
+    if (modoVis === 'real') {
+      const g1 = ctx.createLinearGradient(0,0,0,280)
+      g1.addColorStop(0,'#10B98155'); g1.addColorStop(1,'#10B98100')
+      const g2 = ctx.createLinearGradient(0,0,0,280)
+      g2.addColorStop(0,'#EF444433'); g2.addColorStop(1,'#EF444400')
 
-    const pendGrad = ctx.createLinearGradient(0, 0, 0, 260)
-    pendGrad.addColorStop(0, '#EF444433')
-    pendGrad.addColorStop(1, '#EF444400')
-
-    chartInst.current = new (window as any).Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'SLA %',
-            data: slaVals,
-            borderColor: '#10B981',
-            borderWidth: 2.5,
-            backgroundColor: grad,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 4,
-            pointBackgroundColor: '#10B981',
-            pointBorderColor: '#0F1828',
-            pointBorderWidth: 2,
-            yAxisID: 'y',
-          },
-          {
-            label: 'Meta 90%',
-            data: Array(labels.length).fill(90),
-            borderColor: '#00C6FF55',
-            borderWidth: 1.5,
-            borderDash: [5, 5],
-            pointRadius: 0,
-            fill: false,
-            yAxisID: 'y',
-          },
-          {
-            label: 'Pendentes',
-            data: pendVals,
-            borderColor: '#EF4444',
-            borderWidth: 2,
-            backgroundColor: pendGrad,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 3,
-            pointBackgroundColor: '#EF4444',
-            pointBorderColor: '#0F1828',
-            pointBorderWidth: 2,
-            yAxisID: 'y2',
-          },
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#0F1828',
-            borderColor: '#172438',
-            borderWidth: 1,
-            titleColor: '#7FA8C4',
-            bodyColor: '#EDF2FF',
-            callbacks: {
-              label: (ctx: any) => {
-                if (ctx.dataset.label === 'Meta 90%') return null
-                if (ctx.dataset.label === 'SLA %') return ` SLA: ${ctx.parsed.y.toFixed(1)}%`
-                return ` Pendentes: ${ctx.parsed.y}`
-              }
-            }
-          }
+      chartInst.current = new (window as any).Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label:'SLA %',    data:slaVals,  borderColor:'#10B981', borderWidth:2.5, backgroundColor:g1, fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#10B981', pointBorderColor:'#0F1828', pointBorderWidth:2, yAxisID:'y' },
+            { label:'Meta 90%', data:Array(labels.length).fill(90), borderColor:'#00C6FF55', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false, yAxisID:'y' },
+            { label:'Pendentes',data:pendVals, borderColor:'#EF4444', borderWidth:2, backgroundColor:g2, fill:true, tension:0.4, pointRadius:3, pointBackgroundColor:'#EF4444', pointBorderColor:'#0F1828', pointBorderWidth:2, yAxisID:'y2' },
+          ]
         },
-        scales: {
-          x: {
-            ticks: { color: '#4A6A88', font: { size: 11 }, maxRotation: 45 },
-            grid: { color: '#172438' }
-          },
-          y: {
-            position: 'left',
-            min: 50, max: 100,
-            ticks: { color: '#4A6A88', font: { size: 11 }, callback: (v: any) => v + '%' },
-            grid: { color: '#172438' }
-          },
-          y2: {
-            position: 'right',
-            ticks: { color: '#EF444488', font: { size: 11 } },
-            grid: { drawOnChartArea: false }
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          interaction:{mode:'index',intersect:false},
+          plugins:{legend:{display:false},tooltip:{backgroundColor:'#0F1828',borderColor:'#172438',borderWidth:1,titleColor:'#7FA8C4',bodyColor:'#EDF2FF',callbacks:{label:(c:any)=>{
+            if(c.dataset.label==='Meta 90%') return null
+            if(c.dataset.label==='SLA %') return ` SLA: ${c.parsed.y.toFixed(1)}%`
+            return ` Pendentes: ${c.parsed.y}`
+          }}}},
+          scales:{
+            x:{ticks:{color:'#4A6A88',font:{size:11},maxRotation:45,autoSkip:false},grid:{color:'#172438'}},
+            y:{position:'left',min:50,max:100,ticks:{color:'#4A6A88',font:{size:11},callback:(v:any)=>v+'%'},grid:{color:'#172438'}},
+            y2:{position:'right',ticks:{color:'#EF444488',font:{size:11}},grid:{drawOnChartArea:false}}
           }
         }
-      }
-    })
-  }, [dayData])
+      })
+    } else {
+      const realNull  = [...slaVals,  ...Array(5).fill(null)]
+      const pendNull  = [...pendVals, ...Array(5).fill(null)]
+      const g1 = ctx.createLinearGradient(0,0,0,280)
+      g1.addColorStop(0,'#10B98133'); g1.addColorStop(1,'#10B98100')
+      const g2 = ctx.createLinearGradient(0,0,0,280)
+      g2.addColorStop(0,'#00C6FF44'); g2.addColorStop(1,'#00C6FF00')
+      const g3 = ctx.createLinearGradient(0,0,0,280)
+      g3.addColorStop(0,'#EF444422'); g3.addColorStop(1,'#EF444400')
 
-  const trendColor = trend >= 0 ? '#10B981' : '#EF4444'
-  const trendIcon  = trend >= 0 ? '▲' : '▼'
+      chartInst.current = new (window as any).Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: projLabels,
+          datasets: [
+            { label:'SLA Real',     data:realNull,    borderColor:'#10B98177', borderWidth:2, backgroundColor:g1, fill:true, tension:0.4, pointRadius:3, pointBackgroundColor:'#10B98177', pointBorderColor:'#0F1828', pointBorderWidth:1, yAxisID:'y' },
+            { label:'Projeção SLA', data:projData,    borderColor:'#00C6FF',   borderWidth:2.5, borderDash:[7,4], backgroundColor:g2, fill:true, tension:0.4, pointRadius:5, pointStyle:'triangle', pointBackgroundColor:'#00C6FF', pointBorderColor:'#0F1828', pointBorderWidth:2, yAxisID:'y' },
+            { label:'Meta 90%',     data:Array(projLabels.length).fill(90), borderColor:'#4A6A8866', borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false, yAxisID:'y' },
+            { label:'Pend. Real',   data:pendNull,    borderColor:'#EF444466', borderWidth:1.5, backgroundColor:g3, fill:true, tension:0.4, pointRadius:2, yAxisID:'y2' },
+            { label:'Pend. Proj',   data:pendProjData,borderColor:'#EF4444',   borderWidth:2, borderDash:[6,4], tension:0.4, pointRadius:4, pointStyle:'triangle', pointBackgroundColor:'#EF4444', fill:false, yAxisID:'y2' },
+          ]
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          interaction:{mode:'index',intersect:false},
+          plugins:{legend:{display:false},tooltip:{backgroundColor:'#0F1828',borderColor:'#172438',borderWidth:1,titleColor:'#7FA8C4',bodyColor:'#EDF2FF',callbacks:{label:(c:any)=>{
+            if(c.dataset.label==='Meta 90%'||c.parsed.y==null) return null
+            if(c.dataset.label.includes('SLA')) return ` ${c.dataset.label}: ${c.parsed.y.toFixed(1)}%`
+            return ` ${c.dataset.label}: ${c.parsed.y}`
+          }}}},
+          scales:{
+            x:{ticks:{color:'#4A6A88',font:{size:10},maxRotation:45,autoSkip:false},grid:{color:'#172438'}},
+            y:{position:'left',min:50,max:100,ticks:{color:'#4A6A88',font:{size:11},callback:(v:any)=>v+'%'},grid:{color:'#172438'}},
+            y2:{position:'right',ticks:{color:'#EF444488',font:{size:11}},grid:{drawOnChartArea:false}}
+          }
+        }
+      })
+    }
+  }, [dayData, modoVis])
 
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-        letterSpacing: '.12em', color: '#4A6A88', marginBottom: 16 }}>
-        Evolução Diária — SLA % e Pendentes · {filtDates.length} dia(s)
+      {/* Header com toggle */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+        <div>
+          <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'.12em', color:'#4A6A88' }}>
+            SLA Velocity · {filtDates.length} dia(s) · {ufFiltro === 'TODOS' ? 'Todos os estados' : ufFiltro}
+          </div>
+        </div>
+        <div style={{ display:'flex', gap:0, background:'#0D1525', border:'1px solid #172438', borderRadius:99, padding:4 }}>
+          <button onClick={()=>setModoVis('real')} style={{
+            fontSize:11, fontWeight:700, padding:'5px 16px', borderRadius:99, border:'none', cursor:'pointer', transition:'all .2s',
+            background: modoVis==='real' ? '#10B981' : 'transparent',
+            color: modoVis==='real' ? '#000' : '#4A6A88'
+          }}>REAL</button>
+          <button onClick={()=>setModoVis('proj')} style={{
+            fontSize:11, fontWeight:700, padding:'5px 16px', borderRadius:99, border:'none', cursor:'pointer', transition:'all .2s',
+            background: modoVis==='proj' ? '#00C6FF' : 'transparent',
+            color: modoVis==='proj' ? '#000' : '#4A6A88'
+          }}>PROJEÇÃO</button>
+        </div>
       </div>
 
-      {/* Mini KPIs do período */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-        {[
-          { label: 'SLA Atual',   value: `${lastSla.toFixed(1)}%`,  color: lastSla >= META ? '#10B981' : '#F59E0B' },
-          { label: 'Variação',    value: `${trend >= 0 ? '+' : ''}${trend.toFixed(1)}pp`, color: trendColor },
-          { label: 'Melhor Dia',  value: `${Math.max(...slaVals).toFixed(1)}%`, color: '#10B981' },
-          { label: 'Pior Dia',    value: `${Math.min(...slaVals).toFixed(1)}%`, color: '#EF4444' },
-        ].map(k => (
-          <div key={k.label} style={{ background: '#0D1525', border: '1px solid #172438',
-            borderRadius: 10, padding: '12px 14px' }}>
-            <div style={{ fontSize: 10, color: '#4A6A88', textTransform: 'uppercase',
-              letterSpacing: '.08em', marginBottom: 6 }}>{k.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: k.color }}>{k.value}</div>
+      {/* KPIs */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
+        {modoVis === 'real' ? [
+          { label:'SLA Atual',  value:`${lastSla.toFixed(1)}%`, color: lastSla>=META ? '#10B981':'#F59E0B' },
+          { label:'Variação',   value:`${trend>=0?'+':''}${trend.toFixed(1)}pp`, color:trendColor },
+          { label:'Melhor Dia', value:`${slaVals.length?Math.max(...slaVals).toFixed(1):0}%`, color:'#10B981' },
+          { label:'Pior Dia',   value:`${slaVals.length?Math.min(...slaVals).toFixed(1):0}%`, color:'#EF4444' },
+        ] : [
+          { label:'Projeção amanhã',   value:`${projSlaAmanha.toFixed(1)}%`,  color:'#00C6FF' },
+          { label:`Projeção +5 dias`,  value:`${projSla5dias.toFixed(1)}%`,   color:'#00C6FF' },
+          { label:'Tendência diária',  value:`${trend>=0?'+':''}${filtDates.length>1?(trend/(filtDates.length-1)).toFixed(1):0}pp`, color:trendColor },
+          { label:'Atinge meta em',    value: diasParaMeta ? `~${diasParaMeta}d` : lastSla>=META ? 'Atingida!' : '—', color: diasParaMeta ? '#F59E0B' : lastSla>=META ? '#10B981':'#EF4444' },
+        ]}.map(k => (
+          <div key={k.label} style={{ background:'#0D1525', border:`1px solid ${modoVis==='proj'?'#00C6FF22':'#172438'}`, borderRadius:10, padding:'12px 14px' }}>
+            <div style={{ fontSize:9, color:'#4A6A88', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:6 }}>{k.label}</div>
+            <div style={{ fontSize:22, fontWeight:900, color:k.color }}>{k.value}</div>
           </div>
         ))}
       </div>
 
       {/* Legenda */}
-      <div style={{ display: 'flex', gap: 18, marginBottom: 12 }}>
-        {[
-          { color: '#10B981', label: 'SLA %', dash: false },
-          { color: '#00C6FF', label: 'Meta 90%', dash: true },
-          { color: '#EF4444', label: 'Pendentes (eixo direito)', dash: false },
-        ].map(l => (
-          <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 20, height: 3, borderRadius: 99,
-              background: l.dash ? 'transparent' : l.color,
-              border: l.dash ? `1.5px dashed ${l.color}` : 'none'
-            }} />
-            <span style={{ fontSize: 11, color: '#7FA8C4' }}>{l.label}</span>
+      <div style={{ display:'flex', gap:16, marginBottom:10, flexWrap:'wrap' }}>
+        {modoVis === 'real' ? [
+          { color:'#10B981', label:'SLA %', dash:false },
+          { color:'#00C6FF', label:'Meta 90%', dash:true },
+          { color:'#EF4444', label:'Pendentes (eixo direito)', dash:false },
+        ] : [
+          { color:'#10B98177', label:'SLA real', dash:false },
+          { color:'#00C6FF',   label:'Projeção SLA', dash:true },
+          { color:'#4A6A88',   label:'Meta 90%', dash:true },
+          { color:'#EF4444',   label:'Projeção pendentes (eixo dir.)', dash:true },
+        ]}.map(l => (
+          <div key={l.label} style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <div style={{ width:20, height: l.dash?0:3, borderRadius:99, background:l.dash?'transparent':l.color, border:l.dash?`1.5px dashed ${l.color}`:'none' }} />
+            <span style={{ fontSize:11, color:'#7FA8C4' }}>{l.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Gráfico */}
-      <div style={{ position: 'relative', height: 280 }}>
-        <canvas ref={chartRef} role="img"
-          aria-label={`Gráfico de tendência SLA por dia — ${filtDates.length} dias`} />
+      {/* Gráfico principal */}
+      <div style={{ position:'relative', height:280, marginBottom:16 }}>
+        <canvas ref={chartRef} role="img" aria-label={`Tendência SLA ${modoVis} — ${filtDates.length} dias`} />
       </div>
 
-      {/* Rodapé trend */}
-      <div style={{ marginTop: 14, padding: '10px 14px', background: '#0D1525',
-        borderRadius: 10, border: `1px solid ${trendColor}33`,
-        display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 18, color: trendColor }}>{trendIcon}</span>
-        <span style={{ fontSize: 12, color: '#7FA8C4' }}>
-          SLA {trend >= 0 ? 'subiu' : 'caiu'}{' '}
-          <strong style={{ color: trendColor }}>{Math.abs(trend).toFixed(1)} pontos percentuais</strong>
-          {' '}do primeiro ao último dia do período selecionado.
+      {/* Card de explicação projeção (só no modo PROJEÇÃO) */}
+      {modoVis === 'proj' && (
+        <div style={{ background:'#0D1525', border:'1px solid #00C6FF33', borderRadius:10, padding:'14px 16px', marginBottom:14 }}>
+          <div style={{ fontSize:9, color:'#00C6FF', textTransform:'uppercase', letterSpacing:'.1em', fontWeight:700, marginBottom:10 }}>
+            Como a projeção é calculada
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+            {[
+              { step:'Passo 1 — Coleta', desc:'Pega os SLAs dos últimos 3 dias reais disponíveis na base.' },
+              { step:'Passo 2 — Média móvel', desc:'Calcula a média simples dos 3 valores. Ex: (73%+75%+74%) ÷ 3 = 74%' },
+              { step:'Passo 3 — Tendência', desc:'Adiciona a inclinação média diária suavizada (×0.5) ao resultado.' },
+            ].map(s => (
+              <div key={s.step} style={{ borderLeft:'2px solid #00C6FF33', paddingLeft:10 }}>
+                <div style={{ fontSize:11, color:'#7FA8C4', fontWeight:700, marginBottom:4 }}>{s.step}</div>
+                <div style={{ fontSize:10, color:'#4A6A88', lineHeight:1.5 }}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid #172438', fontSize:10, color:'#4A6A88' }}>
+            Fórmula:{' '}
+            <span style={{ color:'#00C6FF', fontFamily:'monospace' }}>
+              Projeção = média(últ. 3 dias) + inclinação_média × 0.5
+            </span>
+            {' '}· Quanto mais dias na base, mais precisa fica a projeção.
+          </div>
+        </div>
+      )}
+
+      {/* Rodapé tendência */}
+      <div style={{ padding:'10px 14px', background:'#0D1525', borderRadius:10, border:`1px solid ${trendColor}33`, display:'flex', alignItems:'center', gap:8 }}>
+        <span style={{ fontSize:16, color:trendColor }}>{trend>=0?'▲':'▼'}</span>
+        <span style={{ fontSize:12, color:'#7FA8C4' }}>
+          SLA {trend>=0?'subiu':'caiu'}{' '}
+          <strong style={{ color:trendColor }}>{Math.abs(trend).toFixed(1)}pp</strong>
+          {' '}no período selecionado.
           {lastSla < META && (
-            <span style={{ color: '#F59E0B' }}>
-              {' '}Ainda faltam <strong>{(META - lastSla).toFixed(1)}pp</strong> para atingir a meta de {META}%.
+            <span style={{ color:'#F59E0B' }}>
+              {' '}Faltam <strong>{(META-lastSla).toFixed(1)}pp</strong> para atingir {META}%.
+              {modoVis==='proj' && diasParaMeta && ` Projeção: ~${diasParaMeta} dias.`}
             </span>
           )}
+          {lastSla >= META && <span style={{ color:'#10B981' }}> Meta atingida!</span>}
         </span>
       </div>
     </div>
