@@ -377,7 +377,13 @@ function TendenciaChart({ dbRows, filtDates, ufFiltro }: {
           scales:{
             x:{ticks:{color:'#4A6A88',font:{size:11},maxRotation:45,autoSkip:false},grid:{color:'#172438'}},
             y:{position:'left',min:50,max:100,ticks:{color:'#4A6A88',font:{size:11},callback:(v:any)=>v+'%'},grid:{color:'#172438'}},
-            y2:{position:'right',ticks:{color:'#EF444488',font:{size:11}},grid:{drawOnChartArea:false}}
+            y2:{
+              position:'right',
+              min: Math.max(0, Math.min(...pendVals) - 100),
+              max: Math.max(...pendVals) + 100,
+              ticks:{color:'#EF444488',font:{size:11}},
+              grid:{drawOnChartArea:false}
+            }
           }
         }
       })
@@ -414,7 +420,13 @@ function TendenciaChart({ dbRows, filtDates, ufFiltro }: {
           scales:{
             x:{ticks:{color:'#4A6A88',font:{size:10},maxRotation:45,autoSkip:false},grid:{color:'#172438'}},
             y:{position:'left',min:50,max:100,ticks:{color:'#4A6A88',font:{size:11},callback:(v:any)=>v+'%'},grid:{color:'#172438'}},
-            y2:{position:'right',ticks:{color:'#EF444488',font:{size:11}},grid:{drawOnChartArea:false}}
+            y2:{
+              position:'right',
+              min: Math.max(0, Math.min(...pendVals, ...pendProjData.filter((v): v is number => v !== null)) - 100),
+              max: Math.max(...pendVals, ...pendProjData.filter((v): v is number => v !== null)) + 100,
+              ticks:{color:'#EF444488',font:{size:11}},
+              grid:{drawOnChartArea:false}
+            }
           }
         }
       })
